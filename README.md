@@ -21,6 +21,11 @@ StickerBridge is an Android application engineered to extract, normalize, and ex
 
 ```
 tiktok-whatsapp-stickers/
+├── stickerbridge.apk         # Pre-built distribution APK (ready to install)
+├── docs/                     # Mobile-adaptive website & GitHub Pages bundle
+│   ├── index.html            # Landing page with direct APK download
+│   ├── stickerbridge.apk     # Direct download asset
+│   └── mockup_*.webp         # High-res device mockups & icons
 ├── app/
 │   ├── src/
 │   │   ├── main/
@@ -38,22 +43,24 @@ tiktok-whatsapp-stickers/
 │   │   │   │   │   │   └── TikTokCacheScanner.kt        # 1-Tap auto-discovery in TikTok media storage
 │   │   │   │   │   └── whatsapp/
 │   │   │   │   │       └── WhatsAppIntegration.kt       # Intent launcher for official WhatsApp import
-│   │   │   │   │   ├── data/
-│   │   │   │   │   │   ├── model/StickerPack.kt         # Sticker pack & sticker data definitions
-│   │   │   │   │   │   └── storage/StickerStorage.kt    # Local persistence & pack management
-│   │   │   │   │   ├── theme/                           # Material 3 colors, typography & theming
-│   │   │   │   │   └── ui/
-│   │   │   │   │       ├── main/                        # Home screen & ViewModel
-│   │   │   │   │       └── pack_detail/                 # Pack inspector & preview
-│   │   │   │   └── res/                             # Icons, themes, layouts, and XML rules
-│   │   │   └── test/                                # Unit & UI test suites
+│   │   │   │   ├── data/
+│   │   │   │   │   ├── model/StickerPack.kt         # Sticker pack & sticker data definitions
+│   │   │   │   └── ui/                              # Compose screens & ViewModels
+│   │   │   └── res/                                 # Themes, drawables, XML configs
 │   ├── build.gradle.kts
-│   └── proguard-rules.pro
 ├── gradle/
 ├── build.gradle.kts
 ├── settings.gradle.kts
 └── README.md
 ```
+
+---
+
+## 📥 Direct APK Download
+
+No compile steps required to install! You can download the latest pre-built APK directly:
+- **Direct GitHub Raw Download**: [`stickerbridge.apk`](https://github.com/Skinny1ne/StickerBridge/raw/main/stickerbridge.apk)
+- **Live Landing Page**: Available via GitHub Pages at `https://skinny1ne.github.io/StickerBridge/`
 
 ---
 
