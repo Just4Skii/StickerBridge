@@ -59,8 +59,8 @@ tiktok-whatsapp-stickers/
 ## 📥 Direct APK Download
 
 No compile steps required to install! You can download the latest pre-built APK directly:
-- **Direct GitHub Raw Download**: [`stickerbridge.apk`](https://github.com/Skinny1ne/StickerBridge/raw/main/stickerbridge.apk)
-- **Live Landing Page**: Available via GitHub Pages at `https://skinny1ne.github.io/StickerBridge/`
+- **Direct GitHub Raw Download**: [`stickerbridge.apk`](https://github.com/Just4Skii/StickerBridge/raw/main/stickerbridge.apk)
+- **Live Landing Page**: Available via GitHub Pages at `https://Just4Skii.github.io/StickerBridge/`
 
 ---
 

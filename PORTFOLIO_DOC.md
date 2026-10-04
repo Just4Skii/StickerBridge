@@ -11,8 +11,8 @@
 | **Project Name** | **StickerBridge** ⚡ |
 | **Subtitle** | TikTok to WhatsApp Sticker Importer & Animated Engine |
 | **Author / Creator** | **Mpho** (`Mphojunior6@gmail.com`) |
-| **GitHub Handle** | `Skinny1ne` |
-| **GitHub Repository** | `https://github.com/Skinny1ne/StickerBridge` |
+| **GitHub Handle** | `Just4Skii` |
+| **GitHub Repository** | `https://github.com/Just4Skii/StickerBridge` |
 | **Target Platforms** | Android (API 26 / Android 8.0 Oreo through API 35 / Android 15+) |
 | **Tech Stack** | **Kotlin**, **Jetpack Compose (Material 3)**, **Coroutines & Flow**, **Android ContentProvider API**, **WebP RIFF/VP8X/ANMF Engine**, **HTML5/Modern CSS/Vanilla JS** |
 | **Distribution** | Direct Universal APK (Independent, zero app store fees) |
@@ -28,12 +28,12 @@ All files have been verified, compiled, and committed to git. Here are the exact
 - **Website GitHub Pages Directory**: `D:\Projects\tiktok-whatsapp-stickers\docs\stickerbridge.apk`
 - **User Downloads Folder**: `C:\Users\mphoj\Downloads\stickerbridge.apk`
 - **Direct Web / GitHub Raw Download URL**:
-  `https://github.com/Skinny1ne/StickerBridge/raw/main/stickerbridge.apk`
+  `https://github.com/Just4Skii/StickerBridge/raw/main/stickerbridge.apk`
 
 ### B. Mobile-Adaptive Web Landing Page
 - **Live Deployment Bundle**: `D:\Projects\tiktok-whatsapp-stickers\docs\index.html` (GitHub Pages `/docs` ready)
 - **Local Working Copy**: `C:\Users\mphoj\Downloads\stickerbridge.html`
-- **Live GitHub Pages URL** (once pushed): `https://skinny1ne.github.io/StickerBridge/`
+- **Live GitHub Pages URL** (once pushed): `https://Just4Skii.github.io/StickerBridge/`
 
 ### C. Branding, Icons & Device Mockups
 - **App Vector Icon**: `D:\Projects\tiktok-whatsapp-stickers\docs\stickerbridge_icon.svg`

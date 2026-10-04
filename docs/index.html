@@ -358,9 +358,9 @@ h2{font-size:clamp(1.75rem,6.2vw,2.5rem)}
 <section class="dark2"><div class="w bg2">
 <div class="rv"><h2>Behind the build</h2><p class="sub">StickerBridge started as one annoying problem: great stickers, wrong app.</p>
 <div class="lk">
-  <a href="https://github.com/Skinny1ne/StickerBridge" target="_blank" rel="noopener">GitHub Repository <span>&rarr;</span></a>
+  <a href="https://github.com/Just4Skii/StickerBridge" target="_blank" rel="noopener">GitHub Repository <span>&rarr;</span></a>
   <a href="#get">Direct APK Download <span>&rarr;</span></a>
-  <a href="https://github.com/Skinny1ne/StickerBridge#readme" target="_blank" rel="noopener">Technical Breakdown <span>&rarr;</span></a>
+  <a href="https://github.com/Just4Skii/StickerBridge#readme" target="_blank" rel="noopener">Technical Breakdown <span>&rarr;</span></a>
 </div></div>
 <div class="rows rv" style="--d:.1s">
 <div><b>The problem</b><p>Stickers you find in one app can't be used where you actually chat.</p></div>
@@ -400,7 +400,7 @@ h2{font-size:clamp(1.75rem,6.2vw,2.5rem)}
       <span><i></i>100% Free &middot; No Store Fees</span>
     </div>
     <div style="margin-top:8px;font-size:12px;color:var(--smoke)">
-      Direct repo link: <a href="https://github.com/Skinny1ne/StickerBridge/raw/main/stickerbridge.apk" style="color:var(--volt);text-decoration:underline" download="stickerbridge.apk">Download raw APK from GitHub</a> &middot; <a href="https://github.com/Skinny1ne/StickerBridge" target="_blank" rel="noopener" style="color:#fff;text-decoration:underline">Source Code</a>
+      Direct repo link: <a href="https://github.com/Just4Skii/StickerBridge/raw/main/stickerbridge.apk" style="color:var(--volt);text-decoration:underline" download="stickerbridge.apk">Download raw APK from GitHub</a> &middot; <a href="https://github.com/Just4Skii/StickerBridge" target="_blank" rel="noopener" style="color:#fff;text-decoration:underline">Source Code</a>
     </div>
   </div>
 
@@ -523,7 +523,7 @@ $$('.rv').forEach(e=>io.observe(e));
 /* ---- direct apk download handler ---- */
 const dlBtn = $('#dl-apk-btn');
 if (dlBtn) {
-  const GITHUB_RAW_APK = 'https://github.com/Skinny1ne/StickerBridge/raw/main/stickerbridge.apk';
+  const GITHUB_RAW_APK = 'https://github.com/Just4Skii/StickerBridge/raw/main/stickerbridge.apk';
   if (location.protocol.startsWith('http') && !location.hostname.includes('localhost') && !location.hostname.includes('127.0.0.1')) {
     fetch('stickerbridge.apk', { method: 'HEAD' }).then(r => {
       if (!r.ok) dlBtn.href = GITHUB_RAW_APK;
