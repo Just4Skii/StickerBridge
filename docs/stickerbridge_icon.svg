@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108" width="512" height="512">
+  <defs>
+    <radialGradient id="sb-bg" cx="50%" cy="42%" r="75%">
+      <stop offset="0%" stop-color="#1C1C2A"/>
+      <stop offset="70%" stop-color="#0D0D15"/>
+      <stop offset="100%" stop-color="#07070B"/>
+    </radialGradient>
+    <linearGradient id="sb-glow-ring" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#22E4FF" stop-opacity="0.8"/>
+      <stop offset="50%" stop-color="#FF3D9A" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#25D366" stop-opacity="0.85"/>
+    </linearGradient>
+    <filter id="sb-shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="6" stdDeviation="5" flood-color="#000" flood-opacity="0.6"/>
+    </filter>
+  </defs>
+
+  <!-- App Icon Base -->
+  <rect width="108" height="108" rx="26" fill="url(#sb-bg)"/>
+  <rect x="1" y="1" width="106" height="106" rx="25" fill="none" stroke="url(#sb-glow-ring)" stroke-width="1.6"/>
+
+  <!-- Sticker Shadow -->
+  <path d="M33 33 h38 c3.3 0 6 2.7 6 6 v26 l-14 14 h-30 c-3.3 0 -6 -2.7 -6 -6 v-34 c0 -3.3 2.7 -6 6 -6 z" fill="#000000" opacity="0.55"/>
+
+  <!-- Main Sticker Body with Peeled Corner -->
+  <g filter="url(#sb-shadow)">
+    <path d="M31 31 h38 c3.3 0 6 2.7 6 6 v26 l-14 14 h-30 c-3.3 0 -6 -2.7 -6 -6 v-34 c0 -3.3 2.7 -6 6 -6 z" fill="#161622" stroke="#FFFFFF" stroke-width="2.6" stroke-linejoin="round"/>
+    <!-- Sticker Peel Fold -->
+    <path d="M61 63 h14 l-14 14 z" fill="#28283E" stroke="#FFFFFF" stroke-width="1.8" stroke-linejoin="round"/>
+  </g>
+
+  <!-- TikTok Note - Cyan Chromatic Offset -->
+  <path d="M48 42 c2.5 0 4.5 -1 6 -2.8 v14 c0 4.4 -3.6 8 -8 8 c-4.4 0 -8 -3.6 -8 -8 c0 -4.4 3.6 -8 8 -8 c1.2 0 2.3 0.3 3.3 0.8 v-4 z" fill="#22E4FF"/>
+
+  <!-- TikTok Note - Pink Chromatic Offset -->
+  <path d="M51 44 c2.5 0 4.5 -1 6 -2.8 v14 c0 4.4 -3.6 8 -8 8 c-4.4 0 -8 -3.6 -8 -8 c0 -4.4 3.6 -8 8 -8 c1.2 0 2.3 0.3 3.3 0.8 v-4 z" fill="#FF3D9A"/>
+
+  <!-- TikTok Note - Blended Core (White) -->
+  <path d="M49.5 43 c2.2 0 4 -0.8 5.2 -2.3 v14 c0 3.8 -3.1 7 -7 7 c-3.8 0 -7 -3.1 -7 -7 c0 -3.8 3.1 -7 7 -7 c1 0 2 0.3 2.8 0.7 v-5.4 z" fill="#FFFFFF"/>
+
+  <!-- WhatsApp Green Floating Badge -->
+  <g>
+    <circle cx="69" cy="33" r="9.5" fill="#25D366" stroke="#0E0E16" stroke-width="2.4"/>
+    <path d="M64.5 33.2 l3 3 l6 -6" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>

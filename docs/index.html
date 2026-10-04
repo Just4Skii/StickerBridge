@@ -1,0 +1,537 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>StickerBridge: Turn TikTok Stickers into WhatsApp Sticker Packs</title>
+<meta name="description" content="Bring your favorite TikTok stickers to WhatsApp and build sticker packs in just a few taps.">
+<meta property="og:title" content="StickerBridge: TikTok stickers, WhatsApp ready">
+<meta property="og:description" content="Bring your favorite TikTok stickers to WhatsApp and build sticker packs in just a few taps.">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="canonical" href="https://example.com/projects/stickerbridge"><!-- TODO: real URL -->
+<link rel="icon" type="image/svg+xml" href="stickerbridge_icon.svg">
+<link rel="alternate icon" href="stickerbridge_icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@700;800&family=Inter:wght@400;500&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#07070B;--void:#0E0E16;--gr:#1A1A26;--paper:#F5F1E8;--smoke:#9A98A8;--char:#2A2A35;--volt:#22E4FF;--pink:#FF3D9A;--acid:#C6FF3D;--uv:#7B4DFF;--ember:#FF8A2B;--mint:#25D366;--ease:cubic-bezier(.22,1,.36,1)}
+*{box-sizing:border-box;margin:0}
+html{scroll-behavior:smooth;scroll-padding-top:90px}
+body{font:400 17px/1.55 Inter,system-ui,sans-serif;background:var(--ink);color:#fff;overflow-x:clip}
+h1,h2,h3,.d{font-family:'Bricolage Grotesque',system-ui,sans-serif;letter-spacing:-.04em;line-height:.95;font-weight:800}
+.m{font:500 11px/1 'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.08em}
+a{color:inherit;text-decoration:none}button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+:focus-visible{outline:2px solid var(--volt);outline-offset:3px;border-radius:6px}
+.w{max-width:1240px;margin:auto;padding:0 24px}
+section{position:relative;padding:clamp(80px,12vw,160px) 0;overflow:clip}
+.light{background:var(--paper);color:var(--ink)}.light p{color:var(--char)}
+h2{font-size:clamp(2.2rem,5.6vw,4.6rem)}
+.sub{max-width:52ch;margin-top:18px;color:var(--smoke)}
+svg{display:block}
+/* bars */
+.rb{background:#000;border-bottom:1px solid var(--gr);padding:11px 0;color:var(--smoke)}.rb a:hover{color:#fff}
+.nav{position:sticky;top:0;z-index:50;transition:background .4s,backdrop-filter .4s,border-color .4s;border-bottom:1px solid transparent}
+.nav.s{background:#07070Bcc;backdrop-filter:blur(14px);border-color:var(--gr)}
+.ni{display:flex;align-items:center;justify-content:space-between;height:76px;transition:height .4s var(--ease)}.nav.s .ni{height:58px}
+.brand{display:flex;gap:10px;align-items:center;font:800 19px 'Bricolage Grotesque';letter-spacing:-.03em}
+#menu{display:flex;gap:30px;color:var(--smoke);font-size:15px}#menu a:hover{color:#fff}.mo{display:none}
+.bur{display:none;width:44px;height:44px;border-radius:12px;border:1px solid var(--gr);place-items:center}
+.btn{display:inline-flex;align-items:center;gap:10px;padding:16px 24px;border-radius:16px;font-weight:500;transition:transform .3s var(--ease),box-shadow .3s,background .3s;translate:var(--mx,0) var(--my,0)}
+.btn.sm{padding:10px 18px;border-radius:12px;font-size:15px}
+.btn.p{background:var(--acid);color:var(--ink)}.btn.p:hover{transform:translateY(-2px) scale(1.03);box-shadow:0 14px 34px -8px #c6ff3d80}
+.btn.g{border:1px solid #ffffff2a}.btn.g:hover{background:#ffffff12;transform:translateY(-2px)}
+.btn:active{transform:scale(.97)}.btn svg{transition:transform .3s var(--ease)}.btn:hover svg{transform:translateX(4px)}
+/* hero */
+.hero{padding:clamp(40px,7vw,90px) 0 clamp(70px,10vw,130px)}
+.hero:before{content:"";position:absolute;inset:0;background:linear-gradient(#ffffff0b 1px,transparent 1px),linear-gradient(90deg,#ffffff0b 1px,transparent 1px);background-size:64px 64px;mask-image:radial-gradient(ellipse 70% 70% at 65% 40%,#000,transparent)}
+.hg{position:relative;display:grid;grid-template-columns:1.1fr .9fr;gap:40px;align-items:center}
+h1{font-size:clamp(2.6rem,8vw,7.2rem);margin:18px 0 24px;line-height:.9}
+.hl{background:linear-gradient(var(--acid),var(--acid)) 0 92%/100% .1em no-repeat;animation:ul 1s .5s var(--ease) backwards}
+@keyframes ul{from{background-size:0 .1em}}
+.lead{font-size:clamp(1.05rem,2vw,1.3rem);max-width:30ch;color:#d6d4e0}
+.cta{display:flex;flex-wrap:wrap;gap:12px;margin-top:32px}
+.tag{color:var(--smoke)}
+.tv{position:relative;display:grid;grid-template-columns:1fr 1fr;gap:clamp(50px,9vw,110px);max-width:500px;margin-left:auto;width:100%}
+.card{border-radius:28px;padding:14px;background:var(--void);border:1px solid var(--gr)}
+.card .m{display:block;margin:4px 4px 12px;color:var(--smoke)}
+.src{box-shadow:0 0 70px -24px var(--volt),0 0 50px -30px var(--pink)}.pk{box-shadow:0 0 70px -24px var(--mint)}
+.gr{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.sl{aspect-ratio:1;border-radius:18px;background:#ffffff08;border:1px dashed #ffffff22;display:grid;place-items:center;transition:border-color .3s,background .3s}
+.sl svg{width:86%;filter:drop-shadow(0 6px 8px #0009)}
+.sl.hot{border:2px solid var(--volt);box-shadow:0 0 24px #22e4ff55;animation:hot 1s infinite alternate}
+.sl.gone svg{opacity:0}.sl.ok{border:1px solid var(--acid);background:#c6ff3d14}
+.sl.pop svg{animation:pop .6s var(--ease)}
+@keyframes pop{0%{transform:scale(.5)}60%{transform:scale(1.18)}100%{transform:scale(1)}}
+@keyframes hot{to{transform:scale(1.05) rotate(-3deg)}}
+.chip{grid-column:1/-1;justify-self:center;display:flex;gap:9px;align-items:center;padding:10px 14px;border-radius:12px;background:var(--void);border:1px solid var(--gr)}
+.chip b{width:7px;height:7px;border-radius:50%;background:var(--c,var(--smoke));box-shadow:0 0 10px var(--c,transparent);animation:bl 1.2s infinite}
+@keyframes bl{50%{opacity:.35}}
+.tr{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:2}
+.fly{position:absolute;left:0;top:0;z-index:3;pointer-events:none;will-change:transform;filter:drop-shadow(0 14px 14px #000a)}
+.fl{animation:fl var(--fd,6s) ease-in-out infinite var(--dl,0s)}@keyframes fl{50%{translate:0 -12px}}
+.dec{position:absolute;width:64px;z-index:4;transform:rotate(var(--r))}
+/* proof */
+.proof{padding:0 0 clamp(70px,9vw,110px)}.proof .w{border-top:1px solid var(--gr);padding-top:36px;display:flex;flex-wrap:wrap;gap:20px 44px;align-items:center;justify-content:space-between}
+.proof h2{font-size:clamp(1.4rem,2.6vw,2rem);max-width:16ch;line-height:1}.proof ul{display:flex;flex-wrap:wrap;gap:12px;list-style:none;padding:0}
+.proof li{display:flex;gap:9px;align-items:center;padding:10px 14px;border:1px solid var(--gr);border-radius:12px;font-size:15px;color:#d6d4e0}.proof li i{width:8px;height:8px;border-radius:3px;background:var(--c)}
+/* how */
+.steps{position:relative;display:grid;grid-template-columns:repeat(3,1fr);gap:28px;margin-top:70px}
+.rail{position:absolute;top:27px;left:6%;right:6%;height:3px;background:#07070B14;border-radius:3px}
+.rail i{display:block;height:100%;border-radius:3px;background:linear-gradient(90deg,var(--volt),var(--uv),var(--pink),var(--ember));transform-origin:left;transform:scaleX(var(--p,0))}
+.st{position:relative}.n{width:56px;height:56px;border-radius:50%;background:var(--ink);color:#fff;display:grid;place-items:center;position:relative;z-index:2;margin-bottom:22px;font:500 15px 'JetBrains Mono'}
+.st h3{font-size:1.9rem;margin-bottom:10px}.vis{margin-top:22px;height:150px;border-radius:24px;background:#fff;border:1px solid #07070B12;display:flex;gap:10px;align-items:center;justify-content:center;padding:14px;box-shadow:0 20px 40px -26px #07070B55}
+.vis svg{width:56px}.vis .sl{width:58px;border-color:#07070B22;background:#f5f1e8}.vis .sl.hot{border-color:var(--uv);box-shadow:0 0 18px #7b4dff44}
+.mv{animation:mv 2.4s var(--ease) infinite alternate}@keyframes mv{to{translate:40px -6px;rotate:10deg}}
+.tg{padding:8px 12px;border-radius:10px;background:var(--mint);color:#04210f;font-weight:500;font-size:14px}
+/* brand & logo */
+.brand-logo{border-radius:10px;flex-shrink:0;transition:transform .3s var(--ease),filter .3s}
+.brand:hover .brand-logo{transform:rotate(-6deg) scale(1.08);filter:drop-shadow(0 0 10px rgba(34,228,255,0.5))}
+.hero-brand{display:inline-flex;align-items:center;gap:10px;padding:6px 14px 6px 8px;border-radius:100px;background:#ffffff0a;border:1px solid var(--gr);margin-bottom:14px}
+.hero-brand svg{border-radius:6px;flex-shrink:0}
+.hero-brand .tag{margin:0}
+
+/* phones */
+.dark2{background:var(--void)}
+.app-head{margin-bottom:28px}
+.ps{position:relative;height:630px;margin-top:40px;display:flex;justify-content:center;align-items:center}
+.ph{position:absolute;width:262px;aspect-ratio:9/19.5;border-radius:42px;background:#0d0d16;padding:8px;box-shadow:0 0 0 2px #262638,0 35px 85px -15px #000,inset 0 0 0 1.5px rgba(255,255,255,0.12);transition:transform .6s var(--ease),box-shadow .6s var(--ease),z-index .3s;cursor:pointer}
+.ph:before{content:"";position:absolute;top:7px;left:50%;width:38px;height:3px;margin-left:-19px;border-radius:3px;background:#20202e;z-index:10}
+.ph-bar{position:absolute;top:16px;left:50%;width:11px;height:11px;margin-left:-5.5px;border-radius:50%;background:#06060a;box-shadow:inset 0 0 0 2px #1c1c28,0 0 3px #000;z-index:10}
+.ph-glare{position:absolute;inset:8px;border-radius:34px;pointer-events:none;background:linear-gradient(135deg,rgba(255,255,255,0.14) 0%,rgba(255,255,255,0.02) 28%,transparent 55%);z-index:6}
+.sc{position:relative;height:100%;border-radius:34px;background:#07070B;overflow:hidden;display:flex;flex-direction:column}
+.ph-img{width:100%;height:100%;object-fit:cover;object-position:top;display:block;transition:transform .5s var(--ease)}
+.ph:hover .ph-img{transform:scale(1.02)}
+.ph-tag{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);background:rgba(10,10,16,0.88);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,0.15);padding:5px 12px;border-radius:20px;font-size:10px;white-space:nowrap;z-index:7;display:flex;gap:6px;align-items:center;box-shadow:0 8px 20px -4px #000;pointer-events:none}
+.ph-tag span{color:var(--acid);font-weight:700}
+.ph.c{z-index:3;transform:translateY(0)}
+.ph.l{transform:translateX(-75%) rotate(-7deg) scale(.88);z-index:1}
+.ph.r{transform:translateX(75%) rotate(7deg) scale(.88);z-index:1}
+.ps:hover .ph.c{transform:translateY(-14px) scale(1.01)}
+.ps:hover .ph.l{transform:translateX(-84%) rotate(-8deg) scale(.88)}
+.ps:hover .ph.r{transform:translateX(84%) rotate(8deg) scale(.88)}
+.ph.l:hover,.ph.l.active{z-index:5!important;transform:translateX(-50%) rotate(0deg) scale(1.04) translateY(-16px)!important;box-shadow:0 0 0 2px var(--volt),0 40px 90px -15px #000,0 0 45px -10px rgba(34,228,255,0.4)!important}
+.ph.r:hover,.ph.r.active{z-index:5!important;transform:translateX(50%) rotate(0deg) scale(1.04) translateY(-16px)!important;box-shadow:0 0 0 2px var(--mint),0 40px 90px -15px #000,0 0 45px -10px rgba(37,211,102,0.4)!important}
+.ph.c:hover,.ph.c.active{z-index:5!important;transform:translateY(-18px) scale(1.05)!important;box-shadow:0 0 0 2px var(--pink),0 40px 90px -15px #000,0 0 45px -10px rgba(255,61,154,0.4)!important}
+.fc{position:absolute;z-index:6;padding:10px 16px;border-radius:14px;background:rgba(12,12,20,0.88);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,0.12);color:#fff;box-shadow:0 20px 40px -12px rgba(0,0,0,0.7);display:flex;gap:8px;align-items:center;font-size:12px;letter-spacing:0.04em}
+.fc i{width:8px;height:8px;border-radius:50%;background:var(--c);box-shadow:0 0 10px var(--c)}
+/* bento */
+.bn{display:grid;grid-template-columns:repeat(6,1fr);gap:16px;margin-top:56px}
+.bc{border-radius:36px;padding:32px;position:relative;overflow:hidden;background:#fff;border:1px solid #07070B12;transition:transform .5s var(--ease),box-shadow .5s}
+.bc:hover{transform:translateY(-6px);box-shadow:0 30px 50px -30px #07070B66}
+.bc h3{font-size:clamp(1.7rem,3vw,2.5rem);max-width:12ch;margin-bottom:12px}.bc p{max-width:30ch}
+.b1{grid-column:span 4;grid-row:span 2;background:var(--ink);color:#fff;min-height:420px;border-radius:36px}.b1 p{color:var(--smoke)}
+.b2{grid-column:span 2}.b3{grid-column:span 2;background:var(--ember);border-radius:28px}.b3 p{color:#2a1200}
+.b4{grid-column:span 6;background:var(--uv);color:#fff;border-radius:32px;min-height:220px}.b4 p{color:#e4dcff}
+.fan{position:absolute;right:-10px;bottom:-10px;width:62%;height:70%}.fan svg{position:absolute;width:42%;filter:drop-shadow(0 12px 14px #000a);transition:transform .6s var(--ease)}
+.b1:hover .fan svg:nth-child(1){transform:rotate(-24deg) translate(-26px,0)}.b1:hover .fan svg:nth-child(3){transform:rotate(22deg) translate(26px,0)}
+.big{font:800 7rem/.8 'Bricolage Grotesque';letter-spacing:-.06em;position:absolute;right:24px;bottom:12px;color:#07070B}
+.peek{position:absolute;right:30px;top:-10px;display:flex;gap:6px}.peek svg{width:110px;rotate:var(--r)}
+/* wall */
+.wall{background:var(--ink)}.wall h2{text-align:center;max-width:15ch;margin:auto}
+.cap{display:block;margin:22px auto 0;width:max-content;max-width:100%;padding:11px 18px;border-radius:14px;border:1px solid var(--gr);background:var(--void);color:var(--acid);text-align:center}
+#field{display:flex;flex-wrap:wrap;gap:6px 10px;justify-content:center;margin-top:50px;transition:translate .5s var(--ease)}
+.sk{width:var(--z);padding:0;transform:rotate(calc(var(--r) + var(--t,0deg))) scale(var(--sc,1));transition:transform .35s var(--ease),filter .3s;animation:fl var(--fd) ease-in-out infinite var(--dl);filter:drop-shadow(0 8px 10px #0008);position:relative}
+.sk:hover,.sk:focus-visible,.sk.on{--sc:1.22;z-index:5;filter:drop-shadow(0 22px 20px #000c)}
+/* why */
+.why{text-align:center}.why h2{max-width:14ch;margin:auto}.trio{display:flex;flex-wrap:wrap;gap:6px 26px;justify-content:center;margin-top:44px}.trio span{font:800 clamp(2.2rem,6vw,5rem)/1 'Bricolage Grotesque';letter-spacing:-.05em}
+/* build */
+.bg2{display:grid;grid-template-columns:1fr 1fr;gap:70px}
+.rows div{padding:22px 0;border-top:1px solid var(--gr)}.rows b{display:block;font:500 12px 'JetBrains Mono';color:var(--volt);margin-bottom:6px}.rows p{color:#d6d4e0}
+.lk{display:flex;flex-direction:column;gap:12px;margin-top:30px}.lk a{display:flex;justify-content:space-between;padding:18px 20px;border:1px solid var(--gr);border-radius:16px;transition:.3s var(--ease)}.lk a:hover{border-color:var(--volt);transform:translateX(6px)}
+/* cta faq & download */
+.fin{text-align:center}.fin h2{font-size:clamp(2.6rem,8vw,6.6rem);max-width:14ch;margin:0 auto}.fin .cta{justify-content:center}
+.dl-card{max-width:680px;margin:36px auto 0;background:linear-gradient(180deg,#131320,#0B0B12);border:1px solid #ffffff18;border-radius:28px;padding:36px;box-shadow:0 30px 80px -20px #000,0 0 50px -20px rgba(61,220,132,0.22);position:relative;overflow:hidden}
+.dl-card:before{content:"";position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,#3DDC84,var(--volt),transparent)}
+.dl-head{display:flex;gap:18px;align-items:center;margin-bottom:24px}
+.droid-icon{width:54px;height:54px;flex-shrink:0;filter:drop-shadow(0 0 16px rgba(61,220,132,0.45))}
+.dl-act{display:flex;flex-direction:column;gap:14px;align-items:center}
+.btn.dl{background:#3DDC84;color:#041F0E;font-size:1.12rem;font-weight:700;padding:18px 36px;border-radius:18px;display:inline-flex;gap:12px;align-items:center;box-shadow:0 14px 34px -8px rgba(61,220,132,0.6);transition:transform .3s var(--ease),box-shadow .3s}
+.btn.dl:hover{transform:translateY(-3px) scale(1.02);box-shadow:0 18px 44px -6px rgba(61,220,132,0.85)}
+.dl-chips{display:flex;flex-wrap:wrap;gap:8px 16px;justify-content:center;color:var(--smoke);font-size:12px}
+.dl-chips span{display:inline-flex;align-items:center;gap:6px}
+.dl-chips i{width:6px;height:6px;border-radius:50%;background:#3DDC84}
+.inst-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:34px;text-align:left}
+.inst-box{background:#ffffff06;border:1px solid #ffffff0e;border-radius:18px;padding:18px}
+.inst-box b{display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;background:#3DDC8424;color:#3DDC84;font-size:13px;margin-bottom:10px}
+.inst-box h4{font-size:15px;margin-bottom:4px;color:#fff}
+.inst-box p{font-size:13px;color:var(--smoke);line-height:1.4}
+.inst-box code{color:var(--acid);background:#ffffff10;padding:2px 6px;border-radius:6px;font-size:12px}
+@media(max-width:700px){.inst-grid{grid-template-columns:1fr}.dl-card{padding:22px}}
+.peel{position:absolute;width:clamp(80px,12vw,150px);top:12%;right:8%;rotate:14deg;transform-origin:0 100%;animation:fl 5s ease-in-out infinite}
+.faq{max-width:760px;margin:90px auto 0;text-align:left}.faq h3{font-size:2rem;margin-bottom:20px}
+.q{border-top:1px solid var(--gr)}.q button{width:100%;display:flex;justify-content:space-between;gap:20px;padding:22px 0;text-align:left;font-size:1.1rem;font-weight:500}
+.q button i{transition:transform .4s var(--ease);font-style:normal;color:var(--acid)}.q [aria-expanded=true] i{transform:rotate(45deg)}
+.an{display:grid;grid-template-rows:0fr;transition:grid-template-rows .45s var(--ease)}.an>div{overflow:hidden}.an p{color:var(--smoke);padding-bottom:22px;max-width:60ch}.q.o .an{grid-template-rows:1fr}
+footer{border-top:1px solid var(--gr);padding:56px 0 40px;color:var(--smoke);font-size:15px}.fg{display:flex;flex-wrap:wrap;gap:30px;justify-content:space-between}
+.fg nav{display:flex;flex-wrap:wrap;gap:8px 24px}.fg a:hover{color:#fff}.disc{margin-top:36px;font-size:13px;max-width:70ch;opacity:.75}
+/* reveal */
+.rv{opacity:0;transform:translateY(26px);filter:blur(8px);transition:opacity .8s var(--ease),transform .8s var(--ease),filter .8s var(--ease);transition-delay:var(--d,0s)}.rv.in{opacity:1;transform:none;filter:none}
+@media(max-width:900px){
+.hg{grid-template-columns:1fr}.tv{grid-template-columns:1fr;gap:64px;max-width:250px;margin:20px auto 0}
+.steps{grid-template-columns:1fr;gap:44px;padding-left:80px;margin-top:50px}.rail{left:27px;right:auto;top:0;bottom:0;width:3px;height:auto}.rail i{transform-origin:top;transform:scaleY(var(--p,0))}
+.n{position:absolute;left:-80px;top:0;margin:0}
+.bn{grid-template-columns:1fr}.b1,.b2,.b3,.b4{grid-column:auto;grid-row:auto}.b1{min-height:380px}
+.bg2{grid-template-columns:1fr;gap:40px}
+#menu{position:absolute;top:100%;left:0;right:0;flex-direction:column;gap:0;background:#07070Bf2;backdrop-filter:blur(14px);padding:8px 24px 20px;border-bottom:1px solid var(--gr);display:none}
+#menu.open{display:flex}#menu a{padding:14px 0;border-bottom:1px solid var(--gr)}.mo{display:block}.bur{display:grid}.nav .get{display:none}
+.ps{height:520px;margin-top:24px}.ph{width:205px}.ph.l{transform:translateX(-62%) rotate(-6deg) scale(.84)}.ph.r{transform:translateX(62%) rotate(6deg) scale(.84)}
+.ps:hover .ph.l{transform:translateX(-62%) rotate(-6deg) scale(.84)}.ps:hover .ph.r{transform:translateX(62%) rotate(6deg) scale(.84)}
+.ph.l:hover,.ph.r:hover,.ph.c:hover,.ph.active{transform:scale(1.02) translateY(-6px) rotate(0deg)!important;z-index:6!important}.fc{font-size:11px;padding:7px 11px}
+.dec{display:none}}
+@media(max-width:560px){
+.w{padding:0 16px}
+section{padding:clamp(55px,9vw,85px) 0}
+h1{font-size:clamp(2.1rem,7.8vw,3.2rem)}
+h2{font-size:clamp(1.75rem,6.2vw,2.5rem)}
+.hero{padding:24px 0 50px}
+.cta{flex-direction:column;width:100%;gap:10px}
+.cta .btn{width:100%;justify-content:center}
+.steps{padding-left:56px;gap:36px;margin-top:36px}
+.rail{left:18px}
+.n{left:-56px;width:38px;height:38px;font-size:13px}
+.st h3{font-size:1.45rem}
+.vis{height:120px;border-radius:18px}
+.ps{height:440px;margin-top:16px}
+.ph{width:176px;border-radius:32px;padding:6px}
+.ph-glare,.sc{border-radius:26px}
+.ph.l{transform:translateX(-38%) rotate(-4deg) scale(.84)}
+.ph.r{transform:translateX(38%) rotate(4deg) scale(.84)}
+.ps:hover .ph.l{transform:translateX(-38%) rotate(-4deg) scale(.84)}
+.ps:hover .ph.r{transform:translateX(38%) rotate(4deg) scale(.84)}
+.ph.l:hover,.ph.r:hover,.ph.c:hover,.ph.active{transform:scale(1.03) translateY(-6px) rotate(0deg)!important;z-index:6!important}
+.fc{font-size:10px;padding:5px 9px;border-radius:10px}
+.bc{padding:20px;border-radius:22px}
+.b1{min-height:300px}
+.fan{width:75%;height:65%}
+.dl-card{padding:20px 14px;border-radius:22px;margin-top:24px}
+.dl-head{gap:12px}
+.droid-icon{width:42px;height:42px}
+.dl-head h3{font-size:1.35rem}
+.btn.dl{width:100%;justify-content:center;padding:16px 14px;font-size:1rem;gap:8px}
+.dl-chips{font-size:11px;gap:6px 10px}
+.inst-grid{margin-top:24px;gap:12px}
+.inst-box{padding:14px;border-radius:14px}
+.faq{margin-top:60px}
+.q button{font-size:1rem;padding:18px 0}
+.wall #field{gap:4px 6px;margin-top:24px}
+.sk{--z:clamp(46px,14vw,68px)!important}
+}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*:before{animation:none!important}.rv{transform:none;filter:none;transition:opacity .4s}.ph,.bc,.sk{transition:none}.mv{translate:20px 0}}
+</style>
+</head>
+<body>
+<svg style="display:none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="sb-sym-bg" cx="50%" cy="42%" r="75%">
+      <stop offset="0%" stop-color="#1C1C2A"/>
+      <stop offset="70%" stop-color="#0D0D15"/>
+      <stop offset="100%" stop-color="#07070B"/>
+    </radialGradient>
+    <linearGradient id="sb-sym-ring" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#22E4FF" stop-opacity="0.8"/>
+      <stop offset="50%" stop-color="#FF3D9A" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#25D366" stop-opacity="0.85"/>
+    </linearGradient>
+    <filter id="sb-sym-shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="6" stdDeviation="5" flood-color="#000" flood-opacity="0.6"/>
+    </filter>
+  </defs>
+  <symbol id="sb-logo" viewBox="0 0 108 108">
+    <rect width="108" height="108" rx="26" fill="url(#sb-sym-bg)"/>
+    <rect x="1" y="1" width="106" height="106" rx="25" fill="none" stroke="url(#sb-sym-ring)" stroke-width="1.6"/>
+    <path d="M33 33 h38 c3.3 0 6 2.7 6 6 v26 l-14 14 h-30 c-3.3 0 -6 -2.7 -6 -6 v-34 c0 -3.3 2.7 -6 6 -6 z" fill="#000000" opacity="0.55"/>
+    <g filter="url(#sb-sym-shadow)">
+      <path d="M31 31 h38 c3.3 0 6 2.7 6 6 v26 l-14 14 h-30 c-3.3 0 -6 -2.7 -6 -6 v-34 c0 -3.3 2.7 -6 6 -6 z" fill="#161622" stroke="#FFFFFF" stroke-width="2.6" stroke-linejoin="round"/>
+      <path d="M61 63 h14 l-14 14 z" fill="#28283E" stroke="#FFFFFF" stroke-width="1.8" stroke-linejoin="round"/>
+    </g>
+    <path d="M48 42 c2.5 0 4.5 -1 6 -2.8 v14 c0 4.4 -3.6 8 -8 8 c-4.4 0 -8 -3.6 -8 -8 c0 -4.4 3.6 -8 8 -8 c1.2 0 2.3 0.3 3.3 0.8 v-4 z" fill="#22E4FF"/>
+    <path d="M51 44 c2.5 0 4.5 -1 6 -2.8 v14 c0 4.4 -3.6 8 -8 8 c-4.4 0 -8 -3.6 -8 -8 c0 -4.4 3.6 -8 8 -8 c1.2 0 2.3 0.3 3.3 0.8 v-4 z" fill="#FF3D9A"/>
+    <path d="M49.5 43 c2.2 0 4 -0.8 5.2 -2.3 v14 c0 3.8 -3.1 7 -7 7 c-3.8 0 -7 -3.1 -7 -7 c0 -3.8 3.1 -7 7 -7 c1 0 2 0.3 2.8 0.7 v-5.4 z" fill="#FFFFFF"/>
+    <circle cx="69" cy="33" r="9.5" fill="#25D366" stroke="#0E0E16" stroke-width="2.4"/>
+    <path d="M64.5 33.2 l3 3 l6 -6" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+  </symbol>
+</svg>
+<div class="rb m"><div class="w"><a href="/projects">&larr; GraffGrid</a> / <a href="/projects">Projects</a> / <span style="color:#fff">StickerBridge</span></div></div><!-- TODO: point at real portfolio routes -->
+<header class="nav" id="nav"><div class="w ni">
+<a class="brand" href="#top" aria-label="StickerBridge home"><svg class="brand-logo" width="34" height="34" viewBox="0 0 108 108" aria-hidden="true"><use href="#sb-logo"/></svg>StickerBridge</a>
+<nav id="menu" aria-label="Main"><a href="#how">How it works</a><a href="#app">Product</a><a href="#features">Features</a><a href="#faq">FAQ</a><a class="mo" href="#get">Download APK</a></nav>
+<a class="btn p sm get" href="#get">Download APK</a>
+<button class="bur" id="bur" aria-expanded="false" aria-controls="menu" aria-label="Open menu"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M3 6h14M3 14h14"/></svg></button>
+</div></header>
+
+<main id="top">
+<section class="hero"><div class="w hg">
+<div>
+<div class="hero-brand rv">
+<svg width="22" height="22" viewBox="0 0 108 108" aria-hidden="true"><use href="#sb-logo"/></svg>
+<span class="m tag">Android &middot; Free &middot; Built for stickers</span>
+</div>
+<h1 class="rv">TikTok stickers. <span class="hl">WhatsApp</span> ready.</h1>
+<p class="lead rv" style="--d:.1s">Turn your favorite TikTok stickers into WhatsApp sticker packs in a few taps.</p>
+<div class="cta rv" style="--d:.2s"><a class="btn p" href="#get">Download APK <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 9h12M10 4l5 5-5 5"/></svg></a><a class="btn g" href="#how">See how it works</a></div>
+</div>
+<div class="tv" id="tv" role="img" aria-label="Stickers move from a TikTok tray into a WhatsApp sticker pack">
+<div class="card src"><span class="m">Source</span><div class="gr"><i class="sl"></i><i class="sl"></i><i class="sl"></i><i class="sl"></i></div></div>
+<div class="card pk"><span class="m">WhatsApp pack</span><div class="gr"><i class="sl"></i><i class="sl"></i><i class="sl"></i><i class="sl"></i></div></div>
+<div class="chip m" aria-live="polite"><b></b><span>Waiting</span></div>
+<svg class="tr" aria-hidden="true"><defs><linearGradient id="tg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#22E4FF"/><stop offset=".4" stop-color="#7B4DFF"/><stop offset=".7" stop-color="#FF3D9A"/><stop offset="1" stop-color="#C6FF3D"/></linearGradient></defs></svg>
+<i class="dec fl" data-s="star" style="--r:-12deg;top:-26px;left:30%"></i><i class="dec fl" data-s="fire" style="--r:10deg;bottom:-30px;right:-14px;--dl:1s"></i>
+</div>
+</div></section>
+
+<section class="proof"><div class="w"><h2 class="rv">Made for the way you actually use stickers.</h2>
+<ul class="rv"><li><i style="--c:var(--volt)"></i>One-tap conversion</li><li><i style="--c:var(--pink)"></i>Sticker packs</li><li><i style="--c:var(--acid)"></i>Android native</li><li><i style="--c:var(--ember)"></i>Fast export</li><li><i style="--c:var(--uv)"></i>Clean interface</li></ul></div></section>
+
+<section class="light" id="how"><div class="w">
+<h2 class="rv">Three steps. That's it.</h2>
+<div class="steps" id="steps"><div class="rail" aria-hidden="true"><i></i></div>
+<div class="st rv"><div class="n">01</div><h3>Find a sticker</h3><p>Spot one you love on TikTok.</p><div class="vis" id="v1"></div></div>
+<div class="st rv" style="--d:.1s"><div class="n">02</div><h3>Move it</h3><p>Bring it into the app. Sticker secured.</p><div class="vis" id="v2"></div></div>
+<div class="st rv" style="--d:.2s"><div class="n">03</div><h3>Use it</h3><p>Add the pack to WhatsApp and send it.</p><div class="vis" id="v3"></div></div>
+</div></div></section>
+
+<section class="dark2" id="app"><div class="w">
+<div class="app-head rv">
+<span class="m tag" style="color:var(--volt)">● Android Native Experience</span>
+<h2 style="margin-top:8px;max-width:14ch">Small app. Big sticker energy.</h2>
+<p class="sub">1-Tap cache scanner extracts your favorited TikTok stickers and converts them directly into WhatsApp packs with lossless 512&times;512 WebP and animated sticker support.</p>
+</div>
+<div class="ps rv" id="ps">
+<div class="ph l" id="pl" title="Tap to inspect Auto-Scan screen">
+  <div class="ph-bar"></div>
+  <div class="ph-glare"></div>
+  <div class="sc">
+    <picture>
+      <source srcset="mockup_scan.webp" type="image/webp">
+      <img src="mockup_scan.png" alt="StickerBridge 1-Tap Auto-Scan Ingestion" class="ph-img" loading="lazy">
+    </picture>
+    <div class="ph-tag m"><span>01</span> Auto-Scan</div>
+  </div>
+</div>
+<div class="ph r" id="pr" title="Tap to inspect WhatsApp Pack screen">
+  <div class="ph-bar"></div>
+  <div class="ph-glare"></div>
+  <div class="sc">
+    <picture>
+      <source srcset="mockup_dialog.webp" type="image/webp">
+      <img src="mockup_dialog.png" alt="StickerBridge WhatsApp Sticker Pack Ready to Add" class="ph-img" loading="lazy">
+    </picture>
+    <div class="ph-tag m"><span>03</span> WhatsApp Ready</div>
+  </div>
+</div>
+<div class="ph c" id="pc" title="StickerBridge Home Studio">
+  <div class="ph-bar"></div>
+  <div class="ph-glare"></div>
+  <div class="sc">
+    <picture>
+      <source srcset="mockup_main.webp" type="image/webp">
+      <img src="mockup_main.png" alt="StickerBridge Main Dashboard and Favorited Sticker Packs" class="ph-img" loading="lazy">
+    </picture>
+    <div class="ph-tag m"><span>02</span> Curated Packs</div>
+  </div>
+</div>
+<div class="fc m fl" style="--c:var(--volt);left:4%;top:12%;--dl:.4s"><i></i>⚡ 1-Tap Auto-Scan</div>
+<div class="fc m fl" style="--c:var(--pink);right:3%;top:30%;--fd:7s"><i></i>✨ Lossless 512×512 WebP</div>
+<div class="fc m fl" style="--c:var(--mint);left:8%;bottom:10%;--dl:1.2s"><i></i>🟢 Added to WhatsApp</div>
+</div></div></section>
+
+<section class="light" id="features"><div class="w">
+<h2 class="rv" style="max-width:14ch">One idea. Done properly.</h2>
+<div class="bn">
+<article class="bc b1 rv"><h3>Turn one sticker into a whole pack.</h3><p>Start with the one you found. Keep adding until the pack feels right.</p><div class="fan" id="fan"></div></article>
+<article class="bc b2 rv" style="--d:.1s"><h3>Built for Android.</h3><p>A native app, not a website in disguise.</p></article>
+<article class="bc b3 rv" style="--d:.15s"><h3>Fast and simple.</h3><p>Find, move, use.</p><span class="big" aria-hidden="true">3</span></article>
+<article class="bc b4 rv"><h3>Your stickers stay yours.</h3><p>You pick what goes in the pack and what gets sent.</p><div class="peek" id="peek"></div></article>
+</div></div></section>
+
+<section class="wall"><div class="w">
+<h2 class="rv">Your conversations just got more expressive.</h2>
+<p class="cap m" id="cap" aria-live="polite">Pick a mood</p>
+<div id="field"></div></div></section>
+
+<section class="light why"><div class="w">
+<h2 class="rv">You found the perfect sticker. Why should it stay trapped in one app?</h2>
+<div class="trio"><span class="rv" style="color:var(--uv)">Move it.</span><span class="rv" style="--d:.12s;color:#E0701A">Pack it.</span><span class="rv" style="--d:.24s">Send it.</span></div>
+</div></section>
+
+<section class="dark2"><div class="w bg2">
+<div class="rv"><h2>Behind the build</h2><p class="sub">StickerBridge started as one annoying problem: great stickers, wrong app.</p>
+<div class="lk">
+  <a href="https://github.com/Skinny1ne/StickerBridge" target="_blank" rel="noopener">GitHub Repository <span>&rarr;</span></a>
+  <a href="#get">Direct APK Download <span>&rarr;</span></a>
+  <a href="https://github.com/Skinny1ne/StickerBridge#readme" target="_blank" rel="noopener">Technical Breakdown <span>&rarr;</span></a>
+</div></div>
+<div class="rows rv" style="--d:.1s">
+<div><b>The problem</b><p>Stickers you find in one app can't be used where you actually chat.</p></div>
+<div><b>The approach</b><p>An Android app that moves a sticker from where you found it into a WhatsApp-ready pack.</p></div>
+<div><b>What I built</b><p>The app, its interface, and this page, including the StickerBridge identity icon, device mockup, and every sticker drawn as SVG.</p></div>
+<div><b>This page</b><p>Plain HTML, CSS and JavaScript. No framework and no animation library.</p></div>
+<div><b>Built by</b><p>Mpho &middot; GraffGrid</p></div>
+</div></div></section>
+
+<section class="fin" id="get"><div class="w">
+<div class="rv">
+<span class="m tag" style="color:#3DDC84">● Free Android Download</span>
+<h2 style="margin-top:8px">Ready to move your stickers?</h2>
+<p class="sub" style="margin:16px auto 0">Download the direct Android APK to start creating and exporting sticker packs to WhatsApp in seconds.</p>
+</div>
+
+<div class="dl-card rv" style="--d:.15s">
+  <div class="dl-head">
+    <svg class="droid-icon" viewBox="0 0 24 24" fill="#3DDC84" aria-hidden="true">
+      <path d="M6 18c0 .55.45 1 1 1h1v3.5c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5V19h2v3.5c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5V19h1c.55 0 1-.45 1-1V8H6v10zM3.5 8C2.67 8 2 8.67 2 9.5v6c0 .83.67 1.5 1.5 1.5S5 16.33 5 15.5v-6C5 8.67 4.33 8 3.5 8zm17 0c-.83 0-1.5.67-1.5 1.5v6c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5v-6c0-.83-.67-1.5-1.5-1.5zm-4.97-4.84l1.3-1.3c.2-.2.2-.51 0-.71-.2-.2-.51-.2-.71 0l-1.48 1.48C13.67 2.23 12.61 2 11.5 2c-1.11 0-2.17.23-3.14.63L6.88 1.15c-.2-.2-.51-.2-.71 0-.2.2-.2.51 0 .71l1.3 1.3C5.64 4.36 4.41 6.28 4.26 8.5h14.48c-.15-2.22-1.38-4.14-3.21-5.34zM9 6c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm5 0c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1z"/>
+    </svg>
+    <div style="text-align:left">
+      <div class="m tag" style="color:#3DDC84">Android Universal APK</div>
+      <h3 style="font-size:1.6rem;margin-top:2px;color:#fff">StickerBridge v1.0.0</h3>
+    </div>
+  </div>
+
+  <div class="dl-act">
+    <a class="btn dl" href="stickerbridge.apk" download="stickerbridge.apk" id="dl-apk-btn">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Download APK (Direct Install)
+    </a>
+    <div class="dl-chips m">
+      <span><i></i>Any Android Phone</span>
+      <span><i></i>Android 8.0 through 15+</span>
+      <span><i></i>~20 MB</span>
+      <span><i></i>100% Free &middot; No Store Fees</span>
+    </div>
+    <div style="margin-top:8px;font-size:12px;color:var(--smoke)">
+      Direct repo link: <a href="https://github.com/Skinny1ne/StickerBridge/raw/main/stickerbridge.apk" style="color:var(--volt);text-decoration:underline" download="stickerbridge.apk">Download raw APK from GitHub</a> &middot; <a href="https://github.com/Skinny1ne/StickerBridge" target="_blank" rel="noopener" style="color:#fff;text-decoration:underline">Source Code</a>
+    </div>
+  </div>
+
+  <div class="inst-grid">
+    <div class="inst-box">
+      <b>1</b>
+      <h4>Download APK</h4>
+      <p>Tap download to save <code>stickerbridge.apk</code> directly to your device.</p>
+    </div>
+    <div class="inst-box">
+      <b>2</b>
+      <h4>Tap to Install</h4>
+      <p>Open the file from notifications and confirm install. Allow unknown sources if asked.</p>
+    </div>
+    <div class="inst-box">
+      <b>3</b>
+      <h4>1-Tap Scan</h4>
+      <p>Open StickerBridge and tap ⚡ 1-Tap Auto-Scan to send your stickers to WhatsApp!</p>
+    </div>
+  </div>
+</div>
+
+<div class="faq" id="faq"><h3 class="rv">Questions</h3><div id="qs"></div></div>
+</div></section>
+</main>
+
+<footer><div class="w"><div class="fg"><a class="brand" href="#top" style="color:#fff"><svg class="brand-logo" width="30" height="30" viewBox="0 0 108 108" aria-hidden="true"><use href="#sb-logo"/></svg>StickerBridge</a>
+<nav aria-label="Footer"><a href="#app">Product</a><a href="#how">How it works</a><a href="#faq">FAQ</a><a href="#">Privacy</a><a href="#">Terms</a><a href="#">Contact</a><a href="/projects">GraffGrid</a></nav></div>
+<p class="disc">TikTok and WhatsApp are trademarks of their respective owners. StickerBridge is an independent product and is not affiliated with or endorsed by either company.</p>
+<p class="disc">&copy; 2026 StickerBridge &middot; Built by Mpho</p></div></footer>
+
+<script>
+const $=(s,r=document)=>r.querySelector(s),$$=(s,r=document)=>[...r.querySelectorAll(s)];
+const RM=matchMedia('(prefers-reduced-motion:reduce)').matches;
+/* ---- sticker system ---- */
+const E={dot:'<circle cx="36" cy="44" r="5"/><circle cx="64" cy="44" r="5"/>',happy:'<path class="ln" d="M28 48q8-12 16 0M56 48q8-12 16 0"/>',wide:'<circle cx="36" cy="44" r="10" fill="#fff"/><circle cx="64" cy="44" r="10" fill="#fff"/><circle cx="36" cy="44" r="4"/><circle cx="64" cy="44" r="4"/>',side:'<circle cx="36" cy="44" r="9" fill="#fff"/><circle cx="64" cy="44" r="9" fill="#fff"/><circle cx="42" cy="44" r="4"/><circle cx="70" cy="44" r="4"/>',zz:'<path class="ln" d="M28 46h16M56 46h16"/>',x:'<path class="ln" d="M29 39l14 12M43 39L29 51M57 39l14 12M71 39L57 51"/>'};
+const M={grin:'<path d="M30 60q20 24 40 0z"/>',o:'<ellipse cx="50" cy="69" rx="8" ry="10"/>',frown:'<path class="ln" d="M34 73q16-16 32 0"/>',flat:'<path class="ln" d="M36 68h28"/>',smile:'<path class="ln" d="M32 60q18 18 36 0"/>'};
+const F={laugh:['#FFD23F','happy','grin'],shock:['#22E4FF','wide','o'],cry:['#9B7BFF','dot','frown','<path d="M30 54q-5 10 0 14q5-4 0-14z" fill="#22E4FF"/>'],side:['#FF3D9A','side','flat'],angry:['#FF8A2B','dot','frown','<path class="ln" d="M26 32l18 6M74 32l-18 6"/>'],party:['#C6FF3D','happy','smile'],what:['#FFD23F','wide','flat'],sleepy:['#9B7BFF','zz','o'],dead:['#C6FF3D','x','flat'],bro:['#22E4FF','side','frown']};
+const I={heart:['#FF3D9A','M50 90C12 62 6 38 22 24c12-10 24-4 28 6 4-10 16-16 28-6 16 14 10 38-28 66z'],fire:['#FF8A2B','M50 6c4 18 30 28 30 54 0 20-14 32-30 32S20 80 20 60c0-12 6-18 12-26 2 8 6 12 10 12-2-16 0-28 8-40z'],star:['#FFD23F','M50 6l12 30 32 2-25 20 9 32-28-18-28 18 9-32L6 38l32-2z'],bolt:['#22E4FF','M58 4L18 56h28l-8 40 46-58H54z']};
+const CAP={laugh:'Dying.',shock:'No way.',cry:"It's over.",side:'Side-eye.',angry:'Not today.',party:"Let's go.",what:'What?',sleepy:'Five more minutes.',dead:"I'm done.",bro:'bro...',heart:'Aww.',fire:'Fire.',star:'Iconic.',bolt:'Zap.'};
+const S=n=>{let b;if(I[n])b=`<path d="${I[n][1]}" fill="${I[n][0]}"/>`;else{const f=F[n];b=`<path d="M50 7C77 5 94 24 93 52 92 78 72 95 48 93 22 91 6 72 8 46 10 22 28 8 50 7z" fill="${f[0]}"/><g fill="#111">${E[f[1]]}${M[f[2]]}${f[3]||''}</g>`}
+return `<svg viewBox="0 0 100 100" aria-hidden="true"><g stroke="#fff" stroke-width="7" stroke-linejoin="round" paint-order="stroke">${b}</g></svg>`};
+document.head.insertAdjacentHTML('beforeend','<style>.ln{fill:none;stroke:#111;stroke-width:4.5;stroke-linecap:round}</style>');
+$$('[data-s]').forEach(e=>e.innerHTML=S(e.dataset.s));
+const ALL=[...Object.keys(F),...Object.keys(I)];
+
+/* ---- hero transfer ---- */
+(function(){
+const tv=$('#tv'),src=$$('.src .sl'),pk=$$('.pk .sl'),tr=$('.tr'),chip=$('.chip'),O=['laugh','shock','party','heart'];
+const say=(t,c)=>{chip.lastElementChild.textContent=t;chip.style.setProperty('--c',c)};
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+let vis=true;new IntersectionObserver(e=>vis=e[0].isIntersecting).observe(tv);
+const fill=(a,on)=>a.forEach((s,i)=>{s.className='sl'+(on?' ok':'');s.innerHTML=on?S(O[i]):''});
+if(RM){src.forEach((s,i)=>s.innerHTML=S(O[i]));fill(pk,1);say('Pack ready','var(--acid)');return}
+const ctr=el=>{const a=el.getBoundingClientRect(),b=tv.getBoundingClientRect();return[a.left-b.left+a.width/2,a.top-b.top+a.height/2,a.width]};
+const ease=t=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;
+function fly(i,dur){return new Promise(res=>{
+const[x0,y0,w]=ctr(src[i]),[x1,y1]=ctr(pk[i]),cx=(x0+x1)/2+(y1-y0)*.3,cy=(y0+y1)/2-(x1-x0)*.3;
+const el=document.createElement('div');el.className='fly';el.style.width=w+'px';el.innerHTML=S(O[i]);tv.appendChild(el);
+tr.insertAdjacentHTML('beforeend',`<path d="M${x0} ${y0}Q${cx} ${cy} ${x1} ${y1}" pathLength="1" fill="none" stroke="url(#tg)" stroke-width="4" stroke-linecap="round" stroke-dasharray=".3 2" stroke-dashoffset=".3"/>`);
+const p=tr.lastElementChild,t0=performance.now();
+(function f(n){const q=Math.min((n-t0)/dur,1),e=ease(q),u=1-e,x=u*u*x0+2*u*e*cx+e*e*x1,y=u*u*y0+2*u*e*cy+e*e*y1,k=Math.sin(e*Math.PI);
+el.style.transform=`translate(${x-w/2}px,${y-w/2}px) rotate(${-14*k}deg) scale(${1+.18*k})`;p.setAttribute('stroke-dashoffset',.3-e*1.3);
+q<1?requestAnimationFrame(f):(el.remove(),p.remove(),res())})(t0)})}
+(async function run(){while(1){
+src.forEach((s,i)=>{s.className='sl';s.innerHTML=S(O[i])});fill(pk,0);say('Waiting','var(--smoke)');await sleep(1000);
+for(let i=0;i<4;i++){while(!vis)await sleep(300);
+if(!i){src[0].classList.add('hot');say('Found','var(--volt)');await sleep(1000)}
+say('Importing','var(--pink)');src[i].className='sl gone';await fly(i,i?800:1400);
+pk[i].innerHTML=S(O[i]);pk[i].className='sl ok pop';say(`Added ${i+1}/4`,'var(--acid)');await sleep(i?150:400)}
+say('Pack ready','var(--acid)');await sleep(2800)}})()
+})();
+
+/* ---- how-it-works visuals ---- */
+const sl=(n,c='')=>`<i class="sl ${c}">${S(n)}</i>`;
+$('#v1').innerHTML=sl('laugh')+sl('shock','hot')+sl('party');
+$('#v2').innerHTML=`<span class="mv" style="width:58px">${S('shock')}</span><span class="m" style="color:#7B4DFF">Importing</span>`;
+$('#v3').innerHTML=`<div style="display:grid;gap:8px;justify-items:center"><div style="display:flex;gap:6px">${sl('laugh','ok')}${sl('shock','ok')}${sl('heart','ok')}</div><span class="tg m">Pack ready</span></div>`;
+$$('.vis .ok').forEach(e=>e.style.cssText+=';border-color:#25D366;background:#e6fbe9');
+
+/* ---- phones interaction ---- */
+const phs=$$('.ph');
+phs.forEach(p=>p.addEventListener('click',()=>phs.forEach(x=>x.classList.toggle('active',x===p))));
+$('#fan').innerHTML=['shock','party','laugh'].map((n,i)=>`<span>${S(n)}</span>`.replace('<span>','').replace('</span>','')).join('');
+$$('#fan svg').forEach((s,i)=>s.style.cssText=`left:${i*28}%;bottom:${i==1?24:0}%;rotate:${[-10,4,12][i]}deg;z-index:${i==1?2:1}`);
+$('#peek').innerHTML=['side','what','cry'].map(S).join('');$$('#peek svg').forEach((s,i)=>s.style.setProperty('--r',[-10,6,-4][i]+'deg'));
+
+/* ---- sticker wall ---- */
+const field=$('#field'),cap=$('#cap'),rnd=(a,b)=>a+Math.random()*(b-a);
+for(let i=0;i<30;i++){const n=ALL[i%ALL.length],b=document.createElement('button');b.className='sk';b.type='button';b.setAttribute('aria-label',CAP[n]);b.dataset.n=n;b.innerHTML=S(n);
+b.style.cssText=`--z:${Math.round(rnd(64,124))}px;--r:${Math.round(rnd(-14,14))}deg;--fd:${rnd(5,9).toFixed(1)}s;--dl:-${rnd(0,6).toFixed(1)}s`;field.appendChild(b)}
+const pick=b=>{$$('.sk.on').forEach(x=>x.classList.remove('on'));b.classList.add('on');cap.textContent=CAP[b.dataset.n]};
+field.addEventListener('click',e=>{const b=e.target.closest('.sk');b&&pick(b)});
+if(matchMedia('(pointer:fine)').matches&&!RM){
+field.addEventListener('pointermove',e=>{const b=e.target.closest('.sk');if(b){const r=b.getBoundingClientRect();b.style.setProperty('--t',((e.clientX-r.left)/r.width-.5)*18+'deg');cap.textContent=CAP[b.dataset.n]}});
+field.addEventListener('pointerout',e=>{const b=e.target.closest('.sk');b&&b.style.setProperty('--t','0deg')});
+const ws=$('.wall');ws.addEventListener('pointermove',e=>{const r=ws.getBoundingClientRect();field.style.translate=`${((e.clientX-r.left)/r.width-.5)*-22}px ${((e.clientY-r.top)/r.height-.5)*-16}px`})}
+
+/* ---- FAQ ---- */
+const Q=[
+  ['What does the app do?','It takes stickers from your TikTok favorites, cache, and video posts and converts them directly into WhatsApp sticker packs with 1 tap.'],
+  ['Does it support animated stickers and GIFs?','Yes! StickerBridge losslessly converts WebP animation frames and formats them into official WhatsApp animated sticker packs.'],
+  ['How do I install the app on my phone?','Tap "Download APK" above, open the downloaded stickerbridge.apk file on your phone, and select Install.'],
+  ['Does it work on any Android phone?','Yes. StickerBridge works on all Android phones (Samsung, Xiaomi, Google Pixel, Motorola, etc.) running Android 8.0 through Android 15+.'],
+  ['Is it completely free?','Yes. StickerBridge is 100% free and open source. It is distributed directly as an APK with no store fees or paywalls.']
+];
+$('#qs').innerHTML=Q.map((q,i)=>`<div class="q"><button aria-expanded="false" aria-controls="a${i}">${q[0]}<i>+</i></button><div class="an" id="a${i}" role="region"><div><p>${q[1]}</p></div></div></div>`).join('');
+$('#qs').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const q=b.parentElement,o=q.classList.toggle('o');b.setAttribute('aria-expanded',o)});
+
+/* ---- nav, menu, magnet, reveal, rail ---- */
+const nav=$('#nav'),bur=$('#bur'),menu=$('#menu'),rail=$('.steps');
+const onS=()=>{nav.classList.toggle('s',scrollY>40);const r=rail.getBoundingClientRect();rail.style.setProperty('--p',Math.max(0,Math.min(1,(innerHeight*.72-r.top)/r.height)).toFixed(3))};
+addEventListener('scroll',onS,{passive:true});onS();
+bur.onclick=()=>{const o=menu.classList.toggle('open');bur.setAttribute('aria-expanded',o)};
+menu.onclick=e=>{if(e.target.tagName=='A'){menu.classList.remove('open');bur.setAttribute('aria-expanded',false)}};
+if(matchMedia('(pointer:fine)').matches&&!RM)$$('.btn.p').forEach(b=>{b.onpointermove=e=>{const r=b.getBoundingClientRect();b.style.setProperty('--mx',(e.clientX-r.left-r.width/2)*.12+'px');b.style.setProperty('--my',(e.clientY-r.top-r.height/2)*.18+'px')};b.onpointerleave=()=>{b.style.removeProperty('--mx');b.style.removeProperty('--my')}});
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.15});
+$$('.rv').forEach(e=>io.observe(e));
+
+/* ---- direct apk download handler ---- */
+const dlBtn = $('#dl-apk-btn');
+if (dlBtn) {
+  const GITHUB_RAW_APK = 'https://github.com/Skinny1ne/StickerBridge/raw/main/stickerbridge.apk';
+  if (location.protocol.startsWith('http') && !location.hostname.includes('localhost') && !location.hostname.includes('127.0.0.1')) {
+    fetch('stickerbridge.apk', { method: 'HEAD' }).then(r => {
+      if (!r.ok) dlBtn.href = GITHUB_RAW_APK;
+    }).catch(() => {
+      dlBtn.href = GITHUB_RAW_APK;
+    });
+  }
+}
+</script>
+</body>
+</html>

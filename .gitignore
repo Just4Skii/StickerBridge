@@ -1,5 +1,7 @@
 # Built application files
 *.apk
+!stickerbridge.apk
+!docs/*.apk
 *.aar
 *.ap_
 *.aab
