@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Sticker Shadow -->
+    <path
+        android:pathData="M33,33 h38 c3.3,0 6,2.7 6,6 v26 l-14,14 h-30 c-3.3,0 -6,-2.7 -6,-6 v-34 c0,-3.3 2.7,-6 6,-6 z"
+        android:fillColor="#55000000" />
+
+    <!-- Main Sticker Body with Peeled Corner -->
+    <path
+        android:pathData="M31,31 h38 c3.3,0 6,2.7 6,6 v26 l-14,14 h-30 c-3.3,0 -6,-2.7 -6,-6 v-34 c0,-3.3 2.7,-6 6,-6 z"
+        android:fillColor="#FF181824"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="2.5" />
+
+    <!-- Sticker Peel Fold -->
+    <path
+        android:pathData="M61,63 h14 l-14,14 z"
+        android:fillColor="#FF2A2A3C"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="1.5" />
+
+    <!-- TikTok Left Note Chromatic Accent (Cyan) -->
+    <path
+        android:pathData="M48,42 c2.5,0 4.5,-1 6,-2.8 v14 c0,4.4 -3.6,8 -8,8 c-4.4,0 -8,-3.6 -8,-8 c0,-4.4 3.6,-8 8,-8 c1.2,0 2.3,0.3 3.3,0.8 v-4 z"
+        android:fillColor="#FF25F4EE" />
+
+    <!-- TikTok Right Note Chromatic Accent (Pink) -->
+    <path
+        android:pathData="M51,44 c2.5,0 4.5,-1 6,-2.8 v14 c0,4.4 -3.6,8 -8,8 c-4.4,0 -8,-3.6 -8,-8 c0,-4.4 3.6,-8 8,-8 c1.2,0 2.3,0.3 3.3,0.8 v-4 z"
+        android:fillColor="#FFFE2C55" />
+
+    <!-- Center Blended Note Core -->
+    <path
+        android:pathData="M49.5,43 c2.2,0 4,-0.8 5.2,-2.3 v14 c0,3.8 -3.1,7 -7,7 c-3.8,0 -7,-3.1 -7,-7 c0,-3.8 3.1,-7 7,-7 c1,0 2,0.3 2.8,0.7 v-5.4 z"
+        android:fillColor="#FFFFFFFF" />
+
+    <!-- WhatsApp Green Floating Badge on Top-Right -->
+    <path
+        android:pathData="M73,35 a8,8 0 1,1 -16,0 a8,8 0 1,1 16,0"
+        android:fillColor="#FF25D366" />
+    <!-- WhatsApp Check/Chat Icon inside Badge -->
+    <path
+        android:pathData="M62,35 l2.2,2.2 l4.5,-4.5"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="1.8"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+
+</vector>
