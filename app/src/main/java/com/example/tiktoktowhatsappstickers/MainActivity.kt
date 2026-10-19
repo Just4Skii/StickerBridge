@@ -1,8 +1,11 @@
 package com.example.tiktoktowhatsappstickers
 
+import android.Manifest
 import android.app.Activity
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -15,6 +18,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
+import androidx.core.content.ContextCompat
+import com.example.tiktoktowhatsappstickers.core.update.UpdateCheckWorker
 import com.example.tiktoktowhatsappstickers.core.whatsapp.WhatsAppIntentManager
 import com.example.tiktoktowhatsappstickers.data.model.StickerPack
 import com.example.tiktoktowhatsappstickers.theme.TikTokToWhatsAppStickersTheme
@@ -26,6 +31,7 @@ class MainActivity : ComponentActivity() {
     private val viewModel: MainScreenViewModel by viewModels()
     private lateinit var whatsAppManager: WhatsAppIntentManager
     private lateinit var addPackLauncher: ActivityResultLauncher<Intent>
+    private lateinit var notificationPermissionLauncher: ActivityResultLauncher<String>
     private var pendingPackId: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -35,7 +41,7 @@ class MainActivity : ComponentActivity() {
         // Enable animated WebP and GIF playback in UI
         val imageLoader = coil.ImageLoader.Builder(this)
             .components {
-                if (android.os.Build.VERSION.SDK_INT >= 28) {
+                if (Build.VERSION.SDK_INT >= 28) {
                     add(coil.decode.ImageDecoderDecoder.Factory())
                 } else {
                     add(coil.decode.GifDecoder.Factory())
@@ -58,7 +64,21 @@ class MainActivity : ComponentActivity() {
             pendingPackId = null
         }
 
-        // Handle shared intent if opened from TikTok Share Sheet
+        notificationPermissionLauncher = registerForActivityResult(
+            ActivityResultContracts.RequestPermission()
+        ) { /* Background update notifications enabled if granted */ }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+
+        // Schedule periodic background update checks & check once now
+        UpdateCheckWorker.schedule(this)
+        viewModel.checkForUpdate(manual = false)
+
+        // Handle shared intent or update notification tap
         handleIncomingIntent(intent)
 
         setContent {
@@ -78,6 +98,11 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        viewModel.refreshAccessPrompt()
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         handleIncomingIntent(intent)
@@ -85,6 +110,9 @@ class MainActivity : ComponentActivity() {
 
     private fun handleIncomingIntent(intent: Intent?) {
         if (intent == null) return
+        if (intent.getBooleanExtra(UpdateCheckWorker.EXTRA_OPEN_UPDATE, false)) {
+            viewModel.checkForUpdate(manual = true)
+        }
         val action = intent.action
         val type = intent.type ?: return
 
@@ -99,6 +127,7 @@ class MainActivity : ComponentActivity() {
                         viewModel.importTikTokUrl(url)
                     }
                 } else if (type.startsWith("image/") || type.startsWith("video/")) {
+                    @Suppress("DEPRECATION")
                     val uri = intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM)
                     if (uri != null) {
                         viewModel.importFromMediaUris(listOf(uri), "Shared Media Pack")
@@ -107,6 +136,7 @@ class MainActivity : ComponentActivity() {
             }
             Intent.ACTION_SEND_MULTIPLE -> {
                 if (type.startsWith("image/")) {
+                    @Suppress("DEPRECATION")
                     val uris = intent.getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM)
                     if (!uris.isNullOrEmpty()) {
                         viewModel.importFromMediaUris(uris, "Shared Media Pack")

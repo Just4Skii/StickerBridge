@@ -19,7 +19,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -38,6 +40,9 @@ fun PackDetailDialog(
 ) {
     val context = LocalContext.current
     val packDir = File(context.filesDir, "sticker_packs/${pack.id}")
+    val visibleStickers = remember(pack.stickers) {
+        pack.stickers.filter { !it.isPadding }.ifEmpty { pack.stickers }
+    }
     var selectedStickerPreview by remember { mutableStateOf<Sticker?>(null) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
 
@@ -91,8 +96,9 @@ fun PackDetailDialog(
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = "Created by ${pack.publisher}",
-                            style = MaterialTheme.typography.bodyMedium,
+                            text = "Pack ID: ${pack.id} • ${pack.publisher}",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontFamily = FontFamily.Monospace,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -112,7 +118,7 @@ fun PackDetailDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
                 // Metadata Chips Row
                 Row(
@@ -136,14 +142,14 @@ fun PackDetailDialog(
                     SuggestionChip(
                         onClick = {},
                         label = {
-                            Text("${pack.stickers.size} Stickers (512x512)", fontWeight = FontWeight.Medium)
+                            Text("${visibleStickers.size} Unique • 512×512 px", fontWeight = FontWeight.Medium)
                         }
                     )
 
                     if (pack.isAddedToWhatsApp) {
                         SuggestionChip(
                             onClick = {},
-                            label = { Text("Added to WhatsApp ✓", fontWeight = FontWeight.Bold) },
+                            label = { Text("Added ✓", fontWeight = FontWeight.Bold) },
                             colors = SuggestionChipDefaults.suggestionChipColors(
                                 containerColor = WhatsAppGreen.copy(alpha = 0.15f),
                                 labelColor = WhatsAppGreen
@@ -152,12 +158,13 @@ fun PackDetailDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
                 // Enlarged Sticker Quick Preview banner (if tapped)
                 AnimatedVisibility(visible = selectedStickerPreview != null) {
                     selectedStickerPreview?.let { sticker ->
                         val previewFile = File(packDir, sticker.imageFileName)
+                        val shortId = sticker.id.ifBlank { sticker.imageFileName.removeSuffix(".webp") }
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -179,24 +186,30 @@ fun PackDetailDialog(
                                         .clip(RoundedCornerShape(12.dp))
                                         .background(Color(0xFF101018))
                                 )
-                                Spacer(modifier = Modifier.width(16.dp))
+                                Spacer(modifier = Modifier.width(14.dp))
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = "WhatsApp Sticker Specification",
+                                        text = "Sticker ID: #${shortId.take(12)}",
                                         style = MaterialTheme.typography.labelMedium,
+                                        fontFamily = FontFamily.Monospace,
                                         color = WhatsAppGreen,
                                         fontWeight = FontWeight.Bold
                                     )
                                     Text(
-                                        text = "Size: ${sticker.sizeBytes / 1024} KB • 512x512 px",
-                                        style = MaterialTheme.typography.bodyMedium,
+                                        text = "512×512 px • ${(sticker.sizeBytes / 1024).coerceAtLeast(1)} KB • ${if (sticker.isAnimated) "Animated" else "Static"}",
+                                        style = MaterialTheme.typography.bodySmall,
                                         fontWeight = FontWeight.SemiBold
                                     )
-                                    Text(
-                                        text = "Emojis: ${sticker.emojis.joinToString(" ")}",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
+                                    if (sticker.sourceKey.isNotBlank()) {
+                                        Text(
+                                            text = "Source: ${sticker.sourceKey}",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontFamily = FontFamily.Monospace,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
                                 }
                                 IconButton(onClick = { selectedStickerPreview = null }) {
                                     Icon(imageVector = Icons.Default.Close, contentDescription = "Close Preview")
@@ -207,7 +220,7 @@ fun PackDetailDialog(
                 }
 
                 Text(
-                    text = "Pack Contents (Tap to inspect)",
+                    text = "Stickers (Tap any sticker to inspect ID & size)",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
@@ -224,9 +237,10 @@ fun PackDetailDialog(
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    items(pack.stickers) { sticker ->
+                    items(visibleStickers, key = { it.id.ifBlank { it.imageFileName } }) { sticker ->
                         val stickerFile = File(packDir, sticker.imageFileName)
                         val isSelected = selectedStickerPreview?.imageFileName == sticker.imageFileName
+                        val shortHash = sticker.id.take(8).ifBlank { sticker.imageFileName.take(8) }
 
                         Card(
                             modifier = Modifier
@@ -263,8 +277,11 @@ fun PackDetailDialog(
                                 }
                                 Spacer(modifier = Modifier.height(6.dp))
                                 Text(
-                                    text = sticker.emojis.joinToString(" "),
-                                    style = MaterialTheme.typography.bodySmall
+                                    text = "#$shortHash",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontFamily = FontFamily.Monospace,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1
                                 )
                             }
                         }

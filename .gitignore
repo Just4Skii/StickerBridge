@@ -49,6 +49,8 @@ proguard/
 # Keystore files
 *.jks
 *.keystore
+keystore/
+keystore.properties
 
 # Google Services (Firebase, analytics)
 # google-services.json

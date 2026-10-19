@@ -1,7 +1,15 @@
+import java.util.Properties
+
 plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.compose.compiler)
   alias(libs.plugins.kotlin.serialization)
+}
+
+// Release signing secrets live in <repo>/keystore.properties (git-ignored, never committed).
+val keystoreProps = Properties().apply {
+    val f = rootProject.file("keystore.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
 }
 
 android {
@@ -11,20 +19,28 @@ android {
         applicationId = "com.example.tiktoktowhatsappstickers"
         minSdk = 24
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        // Bump BOTH on every release. update.json (repo root) must carry the same versionCode.
+        versionCode = 2
+        versionName = "1.1.0"
 
         val authority = "com.example.tiktoktowhatsappstickers.stickercontentprovider"
         manifestPlaceholders["contentProviderAuthority"] = authority
         buildConfigField("String", "CONTENT_PROVIDER_AUTHORITY", "\"$authority\"")
+        // Where installed apps look for new versions (served by GitHub, no server needed).
+        buildConfigField(
+            "String", "UPDATE_MANIFEST_URL",
+            "\"https://raw.githubusercontent.com/Just4Skii/StickerBridge/main/update.json\""
+        )
     }
 
     signingConfigs {
         create("release") {
-            storeFile = file("release.keystore")
-            storePassword = "tiktokstickerpass"
-            keyAlias = "releaseKey"
-            keyPassword = "tiktokstickerpass"
+            if (keystoreProps.containsKey("storeFile")) {
+                storeFile = rootProject.file(keystoreProps.getProperty("storeFile"))
+                storePassword = keystoreProps.getProperty("storePassword")
+                keyAlias = keystoreProps.getProperty("keyAlias")
+                keyPassword = keystoreProps.getProperty("keyPassword")
+            }
         }
     }
 
@@ -41,7 +57,7 @@ android {
     }
     buildFeatures {
       compose = true
-      aidl = false
+      aidl = true
       buildConfig = true
       shaders = false
     }
@@ -98,4 +114,11 @@ dependencies {
   implementation(libs.kotlinx.serialization.json)
   implementation(libs.androidx.compose.material.icons.extended)
   implementation(libs.androidx.documentfile)
+
+  // Background update checks (notification when a new version is published)
+  implementation(libs.androidx.work.runtime.ktx)
+
+  // Shizuku: the only no-root way to read TikTok's cache on Android 13+
+  implementation(libs.shizuku.api)
+  implementation(libs.shizuku.provider)
 }

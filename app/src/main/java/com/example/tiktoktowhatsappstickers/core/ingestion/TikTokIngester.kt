@@ -2,16 +2,12 @@ package com.example.tiktoktowhatsappstickers.core.ingestion
 
 import android.content.Context
 import android.util.Log
-import com.example.tiktoktowhatsappstickers.core.engine.WebpProcessingEngine
-import com.example.tiktoktowhatsappstickers.data.model.Sticker
 import com.example.tiktoktowhatsappstickers.data.model.StickerPack
-import com.example.tiktoktowhatsappstickers.data.storage.StickerStorageManager
+import com.example.tiktoktowhatsappstickers.data.storage.StickerLibrary
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import java.io.File
-import java.util.UUID
 import java.util.concurrent.TimeUnit
 import java.util.regex.Pattern
 
@@ -29,15 +25,15 @@ class TikTokIngester(private val context: Context) {
         .followRedirects(true)
         .build()
 
-    private val storageManager = StickerStorageManager.getInstance(context)
+    private val library = StickerLibrary(context)
 
     sealed class IngestionResult {
-        data class Success(val pack: StickerPack) : IngestionResult()
+        data class Success(val pack: StickerPack, val alreadyHad: Boolean = false) : IngestionResult()
         data class Error(val message: String) : IngestionResult()
     }
 
     /**
-     * Ingests a TikTok URL (sticker set, video, or direct image CDN URL).
+     * Ingests a TikTok URL (sticker set, video, photo carousel, or direct image CDN URL).
      */
     suspend fun ingestUrl(url: String, customPackName: String? = null): IngestionResult =
         withContext(Dispatchers.IO) {
@@ -60,140 +56,78 @@ class TikTokIngester(private val context: Context) {
 
                 val finalUrl = response.request.url.toString()
                 val contentType = response.header("Content-Type") ?: ""
-                val bodyString = response.body?.string() ?: ""
+                val rawBodyBytes = response.body?.bytes() ?: ByteArray(0)
 
-                // Case 1: Direct Image/WebP download
-                if (contentType.startsWith("image/") || finalUrl.endsWith(".webp") || finalUrl.endsWith(".png")) {
-                    return@withContext importSingleImageAsPack(cleanUrl, customPackName)
+                // Case 1: Direct Image/WebP/GIF download
+                if (contentType.startsWith("image/") ||
+                    finalUrl.endsWith(".webp", ignoreCase = true) ||
+                    finalUrl.endsWith(".png", ignoreCase = true) ||
+                    finalUrl.endsWith(".gif", ignoreCase = true)
+                ) {
+                    if (rawBodyBytes.isEmpty()) {
+                        return@withContext IngestionResult.Error("Empty image received")
+                    }
+                    val key = finalUrl.substringAfterLast('/').substringBefore('?').ifBlank { "direct_image" }
+                    val manual = library.createManualPack(
+                        name = customPackName ?: "TikTok Sticker",
+                        raws = listOf(StickerLibrary.Raw(key, rawBodyBytes)),
+                        publisher = "TikTok Creator"
+                    )
+                    val first = manual.packs.firstOrNull()
+                        ?: return@withContext IngestionResult.Error("Could not convert image into a 512×512 WhatsApp sticker.")
+                    return@withContext IngestionResult.Success(first, manual.alreadyHad)
                 }
 
-                // Case 2: TikTok Web Page - Parse sticker URLs, photo slides, or video preview assets
+                // Case 2: TikTok Web Page - Parse sticker URLs, photo slides, or sticker assets
+                val bodyString = String(rawBodyBytes, Charsets.UTF_8)
                 val stickerUrls = extractImageUrlsFromTikTokPage(bodyString)
                 if (stickerUrls.isEmpty()) {
-                    return@withContext IngestionResult.Error("No media assets found in this link. Tip: On TikTok, stickers are saved in your app favorites — tap '1-Tap Auto-Scan' below to import them directly!")
+                    return@withContext IngestionResult.Error(
+                        "No sticker assets found in this link. Tip: On TikTok, stickers are saved in your app cache — tap '1-Tap Fetch TikTok Stickers' below to import them directly!"
+                    )
                 }
 
-                // Create a new StickerPack
-                val packId = "tt_" + UUID.randomUUID().toString().substring(0, 8)
-                val packDir = File(context.filesDir, "sticker_packs/$packId").apply { mkdirs() }
-                val packName = customPackName ?: ("TikTok Pack #" + packId.takeLast(4))
-
-                val savedStickers = mutableListOf<Sticker>()
-
-                // Download each sticker image
-                stickerUrls.take(30).forEachIndexed { index, imgUrl ->
+                val raws = ArrayList<StickerLibrary.Raw>()
+                stickerUrls.take(StickerLibrary.MAX_PER_PACK).forEachIndexed { index, imgUrl ->
                     try {
                         val imgReq = Request.Builder().url(imgUrl).header("User-Agent", USER_AGENT).build()
                         val imgRes = client.newCall(imgReq).execute()
                         if (imgRes.isSuccessful) {
                             val imgBytes = imgRes.body?.bytes()
                             if (imgBytes != null && imgBytes.isNotEmpty()) {
-                                val stickerFileName = "sticker_${index + 1}.webp"
-                                val stickerFile = File(packDir, stickerFileName)
-                                val success = WebpProcessingEngine.processStaticSticker(
-                                    imgBytes.inputStream(),
-                                    stickerFile
-                                )
-                                if (success && stickerFile.exists()) {
-                                    savedStickers.add(
-                                        Sticker(
-                                            imageFileName = stickerFileName,
-                                            emojis = listOf("🔥", "✨"),
-                                            sizeBytes = stickerFile.length()
-                                        )
-                                    )
-                                }
+                                val key = imgUrl.substringAfterLast('/').substringBefore('?').ifBlank { "url_$index" }
+                                raws += StickerLibrary.Raw(key, imgBytes)
                             }
                         }
                     } catch (e: Exception) {
-                        Log.w(TAG, "Failed to download sticker $index from $imgUrl", e)
+                        Log.w(TAG, "Failed to download asset $index from $imgUrl", e)
                     }
                 }
 
-                if (savedStickers.isEmpty()) {
-                    return@withContext IngestionResult.Error("Could not extract any stickers from this link.")
+                if (raws.isEmpty()) {
+                    return@withContext IngestionResult.Error("Could not download any media from this link.")
                 }
 
-                // WhatsApp requires at least 3 stickers in a pack.
-                // If only 1 or 2 stickers were found, pad them so WhatsApp accepts the pack immediately.
-                while (savedStickers.size < 3) {
-                    val duplicateIndex = savedStickers.size + 1
-                    val original = savedStickers.first()
-                    val dupFileName = "sticker_$duplicateIndex.webp"
-                    val dupFile = File(packDir, dupFileName)
-                    File(packDir, original.imageFileName).copyTo(dupFile, overwrite = true)
-                    savedStickers.add(
-                        Sticker(
-                            imageFileName = dupFileName,
-                            emojis = original.emojis,
-                            sizeBytes = dupFile.length()
-                        )
-                    )
-                }
-
-                // Generate Tray Icon from first sticker
-                val trayFileName = "tray_icon.png"
-                val trayFile = File(packDir, trayFileName)
-                val firstStickerFile = File(packDir, savedStickers.first().imageFileName)
-                WebpProcessingEngine.createTrayIcon(firstStickerFile, trayFile)
-
-                val newPack = StickerPack(
-                    id = packId,
+                val packName = customPackName ?: "TikTok Link Pack"
+                val manual = library.createManualPack(
                     name = packName,
-                    publisher = "TikTok Creator",
-                    trayImageFile = trayFileName,
-                    animatedStickerPack = false,
-                    stickers = savedStickers
+                    raws = raws,
+                    publisher = "TikTok Creator"
                 )
-
-                storageManager.savePack(newPack)
-                IngestionResult.Success(newPack)
+                val first = manual.packs.firstOrNull()
+                    ?: return@withContext IngestionResult.Error("Could not extract valid stickers from this link.")
+                IngestionResult.Success(first, manual.alreadyHad)
             } catch (e: Exception) {
                 Log.e(TAG, "Error ingesting TikTok URL: $url", e)
                 IngestionResult.Error(e.localizedMessage ?: "Unknown error occurred")
             }
         }
 
-    private fun importSingleImageAsPack(imageUrl: String, customPackName: String?): IngestionResult {
-        return try {
-            val req = Request.Builder().url(imageUrl).header("User-Agent", USER_AGENT).build()
-            val res = client.newCall(req).execute()
-            val bytes = res.body?.bytes() ?: return IngestionResult.Error("Empty image received")
-
-            val packId = "tt_single_" + UUID.randomUUID().toString().substring(0, 6)
-            val packDir = File(context.filesDir, "sticker_packs/$packId").apply { mkdirs() }
-
-            val savedStickers = mutableListOf<Sticker>()
-            // WhatsApp requires at least 3 stickers in a pack. We create 3 variants or duplicates
-            for (i in 1..3) {
-                val fileName = "sticker_$i.webp"
-                val file = File(packDir, fileName)
-                WebpProcessingEngine.processStaticSticker(bytes.inputStream(), file)
-                savedStickers.add(Sticker(imageFileName = fileName, emojis = listOf("✨"), sizeBytes = file.length()))
-            }
-
-            val trayFile = File(packDir, "tray_icon.png")
-            WebpProcessingEngine.createTrayIcon(File(packDir, savedStickers.first().imageFileName), trayFile)
-
-            val pack = StickerPack(
-                id = packId,
-                name = customPackName ?: "TikTok Sticker",
-                publisher = "TikTok to WhatsApp",
-                trayImageFile = "tray_icon.png",
-                stickers = savedStickers
-            )
-            storageManager.savePack(pack)
-            IngestionResult.Success(pack)
-        } catch (e: Exception) {
-            IngestionResult.Error("Failed to import image: ${e.message}")
-        }
-    }
-
     private fun extractImageUrlsFromTikTokPage(html: String): List<String> {
         val unescaped = html.replace("\\/", "/").replace("\\u002F", "/")
         val urls = LinkedHashSet<String>()
-        // Match tiktokcdn image / webp URLs
-        val pattern = Pattern.compile("https://[a-zA-Z0-9.-]+\\.(?:tiktokcdn|byteoversea)\\.com/[^\"'\\s<>]+\\.(?:webp|png|jpeg|jpg)")
+        // Match tiktokcdn image / webp / gif URLs
+        val pattern = Pattern.compile("https://[a-zA-Z0-9.-]+\\.(?:tiktokcdn|byteoversea)\\.com/[^\"'\\s<>]+\\.(?:webp|png|gif|jpeg|jpg)")
         val matcher = pattern.matcher(unescaped)
         while (matcher.find()) {
             val url = matcher.group()

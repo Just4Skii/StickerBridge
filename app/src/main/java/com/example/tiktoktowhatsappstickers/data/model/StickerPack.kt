@@ -7,7 +7,13 @@ data class Sticker(
     val imageFileName: String,
     val emojis: List<String> = listOf("✨"),
     val sizeBytes: Long = 0L,
-    val isAnimated: Boolean = false
+    val isAnimated: Boolean = false,
+    /** Stable identity = SHA-256 (first 16 bytes, hex) of the ORIGINAL TikTok image. Same sticker => same id. */
+    val id: String = "",
+    /** TikTok's own cache key (the cache file name) when known, e.g. "6QDD9aRClhSraVLEiCwb0rGpYeg". */
+    val sourceKey: String = "",
+    /** Filler copy added only so a pack reaches WhatsApp's 3-sticker minimum; replaced by real stickers later. */
+    val isPadding: Boolean = false
 )
 
 @Serializable
@@ -23,5 +29,10 @@ data class StickerPack(
     val animatedStickerPack: Boolean = false,
     val imageDataVersion: String = "1",
     val stickers: List<Sticker> = emptyList(),
-    val isAddedToWhatsApp: Boolean = false
-)
+    val isAddedToWhatsApp: Boolean = false,
+    /** True for packs maintained automatically by the TikTok scanner (they grow instead of duplicating). */
+    val autoManaged: Boolean = false
+) {
+    /** Number of real (non-filler) stickers. */
+    val realStickerCount: Int get() = stickers.count { !it.isPadding }
+}

@@ -1,0 +1,15 @@
+{
+  "versionCode": 2,
+  "versionName": "1.1.0",
+  "apkUrl": "https://github.com/Just4Skii/StickerBridge/raw/main/stickerbridge.apk",
+  "sha256": "305921357ff97f0588cfe7cc6256f4afae94301c9f836c309e743446cc45bcd5",
+  "changelog": [
+    "Real TikTok sticker cache scanner (Direct, SAF folder grant & Shizuku support for Android 13+)",
+    "Strict 512x512 WebP frame-by-frame scaling for both static & animated GIF/WebP stickers",
+    "Unique SHA-256 sticker IDs & automatic deduplication across all scans and imports",
+    "Removed all sample/mock packs — 100% genuine user stickers only",
+    "In-app 1-click update downloader & background update notifications"
+  ],
+  "mandatory": false,
+  "minSdk": 24
+}

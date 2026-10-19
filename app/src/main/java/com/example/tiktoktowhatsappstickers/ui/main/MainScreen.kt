@@ -1,8 +1,10 @@
 package com.example.tiktoktowhatsappstickers.ui.main
 
+import android.Manifest
 import android.content.ClipDescription
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -27,11 +29,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import com.example.tiktoktowhatsappstickers.BuildConfig
+import com.example.tiktoktowhatsappstickers.core.shizuku.ShizukuBridge
 import com.example.tiktoktowhatsappstickers.data.model.StickerPack
 import com.example.tiktoktowhatsappstickers.theme.*
 import com.example.tiktoktowhatsappstickers.ui.pack_detail.PackDetailDialog
@@ -58,7 +64,7 @@ fun MainScreen(
         }
     }
 
-    // Photo/Video Picker Launcher
+    // Photo/GIF/WebP Picker Launcher
     val mediaPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickMultipleVisualMedia(maxItems = 30)
     ) { uris: List<Uri> ->
@@ -67,33 +73,19 @@ fun MainScreen(
         }
     }
 
-    // SAF Document Tree Folder Picker
+    // SAF Document Tree Folder Picker (pre-targeted at TikTok's Android/data folder)
     val folderPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocumentTree()
     ) { uri: Uri? ->
-        uri?.let {
-            try {
-                context.contentResolver.takePersistableUriPermission(
-                    it,
-                    android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
-                )
-            } catch (e: Exception) {
-                // Ignore if persistable permission not granted
-            }
-            viewModel.scanDocumentTree(it)
-        }
+        viewModel.onFolderGranted(uri)
     }
 
-    // SAF Multiple Document Files Picker (.cnt / images)
-    val filePickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenMultipleDocuments()
-    ) { uris: List<Uri> ->
-        if (uris.isNotEmpty()) {
-            viewModel.scanSelectedCacheFiles(uris)
-        }
+    // Legacy Storage Permission Launcher (Android 8 - 9)
+    val storagePermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted: Boolean ->
+        viewModel.onStoragePermissionResult(granted)
     }
-
-    var showCacheScannerDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -107,7 +99,7 @@ fun MainScreen(
                         // App Brand Badge
                         Box(
                             modifier = Modifier
-                                .size(42.dp)
+                                .size(40.dp)
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(
                                     Brush.linearGradient(
@@ -117,14 +109,14 @@ fun MainScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                "TT",
+                                "SB",
                                 color = Color.White,
-                                style = MaterialTheme.typography.titleMedium,
+                                style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Black
                             )
                         }
 
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
 
                         Column(modifier = Modifier.weight(1f)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -148,11 +140,26 @@ fun MainScreen(
                                 )
                             }
                             Text(
-                                text = "Sticker Studio & Exporter",
+                                text = "v${BuildConfig.VERSION_NAME} • 512×512 Deduplicated Engine",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
+
+                        // Check for App Update Icon Button
+                        IconButton(
+                            onClick = { viewModel.checkForUpdate(manual = true) },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.SystemUpdateAlt,
+                                contentDescription = "Check for Updates",
+                                tint = TikTokCyan,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.width(4.dp))
 
                         // WhatsApp Status Pill
                         Surface(
@@ -194,11 +201,19 @@ fun MainScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
+            // OTA Update Banner (shown when a new version is published in update.json)
+            UpdateBanner(
+                updateUi = uiState.update,
+                updateCheckMessage = uiState.updateCheckMessage,
+                onStartUpdate = { viewModel.startUpdate() },
+                onDismissMessage = { viewModel.dismissUpdateMessage() }
+            )
+
             // Import Studio Card
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
                 shape = RoundedCornerShape(24.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surface
@@ -212,7 +227,7 @@ fun MainScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(18.dp)
+                        .padding(16.dp)
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
@@ -223,7 +238,7 @@ fun MainScreen(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Import from TikTok",
+                            text = "Fetch & Convert TikTok Stickers",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.ExtraBold
                         )
@@ -231,19 +246,46 @@ fun MainScreen(
 
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Paste a TikTok video link or photo carousel to extract stickers. (Use 1-Tap Auto-Scan below for all saved stickers!)",
+                        text = "Scan TikTok's sticker cache directly, or import from a link / gallery. Every sticker gets a unique ID and is scaled to 512×512.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
-                    // Input Field
+                    // 1-Click Automatic TikTok Sticker Scanner
+                    Button(
+                        onClick = { viewModel.scanTikTok() },
+                        enabled = !uiState.isImporting,
+                        shape = RoundedCornerShape(14.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = TikTokCyan,
+                            contentColor = Color.Black
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.AutoFixHigh,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                            tint = Color.Black
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "⚡ 1-Tap Fetch TikTok Stickers",
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color.Black
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Input Field for Link
                     OutlinedTextField(
                         value = inputUrl,
                         onValueChange = { inputUrl = it },
                         modifier = Modifier.fillMaxWidth(),
-                        placeholder = { Text("https://www.tiktok.com/@.../video/... or photo link") },
+                        placeholder = { Text("Paste TikTok link or direct sticker URL…") },
                         singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = TikTokPink,
@@ -278,7 +320,7 @@ fun MainScreen(
                         shape = RoundedCornerShape(14.dp)
                     )
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
 
                     // Action Buttons Row
                     Row(
@@ -305,9 +347,10 @@ fun MainScreen(
                         OutlinedButton(
                             onClick = {
                                 mediaPickerLauncher.launch(
-                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)
+                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                                 )
                             },
+                            enabled = !uiState.isImporting,
                             shape = RoundedCornerShape(14.dp),
                             modifier = Modifier.weight(1f),
                             border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
@@ -318,38 +361,9 @@ fun MainScreen(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    // 1-Click Automatic Device Scanner (Zero manual folder searching)
-                    Button(
-                        onClick = {
-                            viewModel.scanDeviceMediaAutomatically()
-                        },
-                        enabled = !uiState.isImporting,
-                        shape = RoundedCornerShape(14.dp),
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = TikTokCyan,
-                            contentColor = Color.Black
-                        )
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.AutoFixHigh,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                            tint = Color.Black
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "⚡ 1-Tap Auto-Scan TikTok Media",
-                            fontWeight = FontWeight.ExtraBold,
-                            color = Color.Black
-                        )
-                    }
-
                     // Loading State
                     AnimatedVisibility(visible = uiState.isImporting) {
-                        Column(modifier = Modifier.padding(top = 14.dp)) {
+                        Column(modifier = Modifier.padding(top = 12.dp)) {
                             LinearProgressIndicator(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -366,9 +380,46 @@ fun MainScreen(
                         }
                     }
 
+                    // Info / Deduplication Alert
+                    uiState.infoMessage?.let { info ->
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = WhatsAppGreen.copy(alpha = 0.14f)),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CheckCircle,
+                                    contentDescription = null,
+                                    tint = WhatsAppGreen
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = info,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                IconButton(onClick = { viewModel.clearInfo() }, modifier = Modifier.size(28.dp)) {
+                                    Icon(
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = "Dismiss",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
                     // Error Alert
                     uiState.errorMessage?.let { error ->
-                        Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(10.dp))
                         Card(
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
                             shape = RoundedCornerShape(12.dp)
@@ -391,11 +442,12 @@ fun MainScreen(
                                     color = MaterialTheme.colorScheme.onErrorContainer,
                                     modifier = Modifier.weight(1f)
                                 )
-                                IconButton(onClick = { viewModel.clearError() }) {
+                                IconButton(onClick = { viewModel.clearError() }, modifier = Modifier.size(28.dp)) {
                                     Icon(
                                         imageVector = Icons.Default.Close,
                                         contentDescription = "Dismiss",
-                                        tint = MaterialTheme.colorScheme.error
+                                        tint = MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.size(16.dp)
                                     )
                                 }
                             }
@@ -408,37 +460,70 @@ fun MainScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 8.dp),
+                    .padding(horizontal = 20.dp, vertical = 6.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Ready for WhatsApp",
+                    text = "Your Sticker Library",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onBackground
                 )
                 Text(
-                    text = "${uiState.packs.size} Packs",
+                    text = "${uiState.packs.size} Pack${if (uiState.packs.size == 1) "" else "s"}",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
-            // Sticker Packs List
-            LazyColumn(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth(),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                items(uiState.packs, key = { it.id }) { pack ->
-                    StickerPackCard(
-                        pack = pack,
-                        onCardClick = { viewModel.selectPack(pack) },
-                        onAddToWhatsApp = { onAddToWhatsAppIntent(pack) }
-                    )
+            // Sticker Packs List or Honest Empty State
+            if (uiState.packs.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .padding(horizontal = 28.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            imageVector = Icons.Default.AutoAwesomeMotion,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                            modifier = Modifier.size(48.dp)
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = "No Sticker Packs Yet",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "Open TikTok, view or favorite your stickers in DMs or comments, then tap '1-Tap Fetch TikTok Stickers' above.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(uiState.packs, key = { it.id }) { pack ->
+                        StickerPackCard(
+                            pack = pack,
+                            onCardClick = { viewModel.selectPack(pack) },
+                            onAddToWhatsApp = { onAddToWhatsAppIntent(pack) }
+                        )
+                    }
                 }
             }
         }
@@ -454,58 +539,366 @@ fun MainScreen(
         )
     }
 
-    // Cache Scanner Modal Dialog
-    if (showCacheScannerDialog) {
-        AlertDialog(
-            onDismissRequest = { showCacheScannerDialog = false },
-            icon = {
-                Icon(
-                    imageVector = Icons.Default.FolderSpecial,
-                    contentDescription = null,
-                    tint = TikTokCyan,
-                    modifier = Modifier.size(32.dp)
-                )
+    // One-time Access Setup Dialog (Storage Permission / Folder Grant / Shizuku)
+    uiState.accessPrompt?.let { prompt ->
+        AccessSetupDialog(
+            prompt = prompt,
+            onDismiss = { viewModel.dismissAccessPrompt() },
+            onRequestStoragePermission = {
+                viewModel.dismissAccessPrompt()
+                storagePermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
             },
-            title = {
-                Text(
-                    text = "Import Device TikTok Cache",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
+            onLaunchFolderPicker = { suggestedUri ->
+                viewModel.dismissAccessPrompt()
+                folderPickerLauncher.launch(suggestedUri)
             },
-            text = {
-                Column {
-                    Text(
-                        text = "TikTok caches your saved and received stickers in its storage folder as .cnt files:\n\nAndroid/data/com.zhiliaoapp.musically/cache/picture/fresco_custom_cache/\n\nChoose an extraction method below:",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+            onRequestShizukuPermission = {
+                viewModel.requestShizukuPermission()
             },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        showCacheScannerDialog = false
-                        folderPickerLauncher.launch(null)
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = TikTokCyan),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Text("Select Cache Folder", color = Color.Black, fontWeight = FontWeight.Bold)
-                }
-            },
-            dismissButton = {
-                OutlinedButton(
-                    onClick = {
-                        showCacheScannerDialog = false
-                        filePickerLauncher.launch(arrayOf("*/*"))
-                    },
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Text("Pick .cnt Files Directly")
-                }
+            onRefreshShizuku = {
+                viewModel.refreshAccessPrompt()
+                viewModel.scanTikTok()
             }
         )
+    }
+}
+
+@Composable
+private fun UpdateBanner(
+    updateUi: UpdateUi,
+    updateCheckMessage: String?,
+    onStartUpdate: () -> Unit,
+    onDismissMessage: () -> Unit
+) {
+    when (updateUi) {
+        is UpdateUi.Available -> {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = WhatsAppGreen.copy(alpha = 0.15f)),
+                border = androidx.compose.foundation.BorderStroke(1.dp, WhatsAppGreen)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.SystemUpdate,
+                        contentDescription = null,
+                        tint = WhatsAppGreen
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Update v${updateUi.info.versionName} Available",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        if (updateUi.info.changelog.isNotEmpty()) {
+                            Text(
+                                text = updateUi.info.changelog.joinToString(" • "),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 2
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = onStartUpdate,
+                        colors = ButtonDefaults.buttonColors(containerColor = WhatsAppGreen),
+                        shape = RoundedCornerShape(12.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Text("Install", color = Color.White, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+        is UpdateUi.Downloading -> {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Text(
+                        text = "Downloading Update v${updateUi.info.versionName}… ${if (updateUi.percent >= 0) "${updateUi.percent}%" else ""}",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    if (updateUi.percent in 0..100) {
+                        LinearProgressIndicator(
+                            progress = { updateUi.percent / 100f },
+                            modifier = Modifier.fillMaxWidth(),
+                            color = WhatsAppGreen
+                        )
+                    } else {
+                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = WhatsAppGreen)
+                    }
+                }
+            }
+        }
+        is UpdateUi.Ready -> {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = WhatsAppGreen.copy(alpha = 0.2f)),
+                border = androidx.compose.foundation.BorderStroke(1.dp, WhatsAppGreen)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "v${updateUi.info.versionName} downloaded & verified",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Button(
+                        onClick = onStartUpdate,
+                        colors = ButtonDefaults.buttonColors(containerColor = WhatsAppGreen),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("Tap to Install", color = Color.White, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+        is UpdateUi.Error -> {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Update error: ${updateUi.message}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        modifier = Modifier.weight(1f)
+                    )
+                    TextButton(onClick = onStartUpdate) {
+                        Text("Retry", fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+        UpdateUi.None -> {
+            if (updateCheckMessage != null) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Verified,
+                            contentDescription = null,
+                            tint = WhatsAppGreen,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = updateCheckMessage,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.weight(1f)
+                        )
+                        IconButton(onClick = onDismissMessage, modifier = Modifier.size(24.dp)) {
+                            Icon(imageVector = Icons.Default.Close, contentDescription = "Close", modifier = Modifier.size(16.dp))
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AccessSetupDialog(
+    prompt: AccessPrompt,
+    onDismiss: () -> Unit,
+    onRequestStoragePermission: () -> Unit,
+    onLaunchFolderPicker: (Uri) -> Unit,
+    onRequestShizukuPermission: () -> Unit,
+    onRefreshShizuku: () -> Unit
+) {
+    val context = LocalContext.current
+    when (prompt) {
+        AccessPrompt.StoragePermission -> {
+            AlertDialog(
+                onDismissRequest = onDismiss,
+                title = { Text("Allow Storage Access", fontWeight = FontWeight.Bold) },
+                text = {
+                    Text("StickerBridge needs storage permission once to read TikTok's cached stickers on your device.")
+                },
+                confirmButton = {
+                    Button(
+                        onClick = onRequestStoragePermission,
+                        colors = ButtonDefaults.buttonColors(containerColor = TikTokCyan)
+                    ) {
+                        Text("Grant Permission", color = Color.Black, fontWeight = FontWeight.Bold)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = onDismiss) { Text("Cancel") }
+                }
+            )
+        }
+        is AccessPrompt.FolderGrant -> {
+            AlertDialog(
+                onDismissRequest = onDismiss,
+                title = { Text("One-Time TikTok Folder Grant", fontWeight = FontWeight.Bold) },
+                text = {
+                    Text(
+                        "Android protects app folders until you approve them once.\n\n" +
+                            "On the next screen, tap 'Use this folder' at the bottom so StickerBridge can read TikTok's sticker cache automatically from now on."
+                    )
+                },
+                confirmButton = {
+                    Button(
+                        onClick = { onLaunchFolderPicker(prompt.suggested) },
+                        colors = ButtonDefaults.buttonColors(containerColor = TikTokCyan)
+                    ) {
+                        Text("Open TikTok Folder", color = Color.Black, fontWeight = FontWeight.Bold)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = onDismiss) { Text("Cancel") }
+                }
+            )
+        }
+        is AccessPrompt.Shizuku -> {
+            AlertDialog(
+                onDismissRequest = onDismiss,
+                title = { Text("Unlock TikTok Sticker Cache (Android 13+)", fontWeight = FontWeight.Bold) },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            "On Android 13+, Google blocks regular apps and the system file picker from opening another app's Android/data folder.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        when (prompt.state) {
+                            ShizukuBridge.State.NOT_INSTALLED -> {
+                                Text(
+                                    "To read TikTok's internal sticker cache without root, install the free Shizuku helper once and enable Wireless Debugging:",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                            ShizukuBridge.State.NOT_RUNNING -> {
+                                Text(
+                                    "Shizuku is installed on your phone, but isn't running yet. Open Shizuku, tap 'Start via Wireless debugging', then return here.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                            ShizukuBridge.State.NEEDS_PERMISSION -> {
+                                Text(
+                                    "Shizuku is running! Tap 'Allow in Shizuku' below to let StickerBridge read TikTok's sticker cache in 1 tap.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                            ShizukuBridge.State.READY -> {
+                                Text(
+                                    "Shizuku is ready! Tap 'Scan Now' to fetch your TikTok stickers.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+                        if (prompt.folderGrantAlsoPossible) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            OutlinedButton(
+                                onClick = { onLaunchFolderPicker(prompt.suggested) },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("Try System Folder Picker Instead")
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    when (prompt.state) {
+                        ShizukuBridge.State.NOT_INSTALLED -> {
+                            Button(
+                                onClick = {
+                                    val market = Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=${ShizukuBridge.PACKAGE}"))
+                                    val web = Intent(Intent.ACTION_VIEW, Uri.parse(ShizukuBridge.RELEASES_URL))
+                                    runCatching { context.startActivity(market) }.onFailure { context.startActivity(web) }
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = TikTokCyan)
+                            ) {
+                                Text("Install Shizuku (Free)", color = Color.Black, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                        ShizukuBridge.State.NOT_RUNNING -> {
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedButton(onClick = onRefreshShizuku) {
+                                    Text("I Started It")
+                                }
+                                Button(
+                                    onClick = {
+                                        val launch = context.packageManager.getLaunchIntentForPackage(ShizukuBridge.PACKAGE)
+                                        if (launch != null) context.startActivity(launch)
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = TikTokCyan)
+                                ) {
+                                    Text("Open Shizuku", color = Color.Black, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                        ShizukuBridge.State.NEEDS_PERMISSION -> {
+                            Button(
+                                onClick = onRequestShizukuPermission,
+                                colors = ButtonDefaults.buttonColors(containerColor = TikTokCyan)
+                            ) {
+                                Text("Allow in Shizuku", color = Color.Black, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                        ShizukuBridge.State.READY -> {
+                            Button(
+                                onClick = onRefreshShizuku,
+                                colors = ButtonDefaults.buttonColors(containerColor = TikTokCyan)
+                            ) {
+                                Text("Scan Now", color = Color.Black, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = onDismiss) { Text("Close") }
+                }
+            )
+        }
     }
 }
 
@@ -518,6 +911,9 @@ fun StickerPackCard(
     val context = LocalContext.current
     val packDir = File(context.filesDir, "sticker_packs/${pack.id}")
     val trayFile = File(packDir, pack.trayImageFile)
+    val realStickers = remember(pack.stickers) {
+        pack.stickers.filter { !it.isPadding }.ifEmpty { pack.stickers }
+    }
 
     Card(
         modifier = Modifier
@@ -567,7 +963,7 @@ fun StickerPackCard(
                     Spacer(modifier = Modifier.height(2.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = "${pack.stickers.size} stickers",
+                            text = "${realStickers.size} unique • 512×512",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -577,12 +973,18 @@ fun StickerPackCard(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
-                            text = if (pack.animatedStickerPack) "Animated WebP" else "Static WebP",
+                            text = if (pack.animatedStickerPack) "Animated" else "Static",
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
                             color = if (pack.animatedStickerPack) TikTokPink else TikTokCyan
                         )
                     }
+                    Text(
+                        text = "ID: ${pack.id}",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontFamily = FontFamily.Monospace,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f)
+                    )
                 }
 
                 Spacer(modifier = Modifier.width(8.dp))
@@ -635,7 +1037,7 @@ fun StickerPackCard(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(pack.stickers.take(5)) { sticker ->
+                items(realStickers.take(5), key = { it.id.ifBlank { it.imageFileName } }) { sticker ->
                     val stickerFile = File(packDir, sticker.imageFileName)
                     Box(
                         modifier = Modifier
@@ -652,7 +1054,7 @@ fun StickerPackCard(
                         )
                     }
                 }
-                if (pack.stickers.size > 5) {
+                if (realStickers.size > 5) {
                     item {
                         Box(
                             modifier = Modifier
@@ -662,7 +1064,7 @@ fun StickerPackCard(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = "+${pack.stickers.size - 5}",
+                                text = "+${realStickers.size - 5}",
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant

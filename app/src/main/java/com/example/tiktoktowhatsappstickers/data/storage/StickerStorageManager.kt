@@ -1,12 +1,7 @@
 package com.example.tiktoktowhatsappstickers.data.storage
 
 import android.content.Context
-import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.Color
-import android.graphics.Paint
 import android.util.Log
-import com.example.tiktoktowhatsappstickers.data.model.Sticker
 import com.example.tiktoktowhatsappstickers.data.model.StickerPack
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -14,14 +9,29 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.File
-import java.io.FileOutputStream
 
+/**
+ * Persists sticker packs under filesDir/sticker_packs and publishes them as a Flow.
+ *
+ * The library starts EMPTY: nothing is pre-seeded. Every pack in here came from the user's own TikTok
+ * data (scan, link, shared or picked media).
+ */
 class StickerStorageManager private constructor(private val context: Context) {
 
     companion object {
         private const val TAG = "StickerStorageManager"
         private const val PACKS_DIR = "sticker_packs"
         private const val CONTENTS_FILE = "contents.json"
+        private const val REJECTED_FILE = "rejected_ids.txt"
+        private const val MIGRATION_FILE = ".migrated_v2"
+
+        /** Demo packs seeded by v1.0 ("fed in" mock data). Removed on upgrade. */
+        private val LEGACY_SAMPLE_IDS = setOf("tiktok_viral_memes", "tiktok_reactions")
+
+        /** v1.0 scans minted a brand-new random pack on every run, which is what caused duplicates. */
+        private val LEGACY_SCAN_PREFIXES = listOf("tt_anim_", "tt_static_")
+        private val LEGACY_SCAN_NAME = Regex("^TikTok (Animated |Favorited )?Stickers( #\\d+)?$")
+        private val LEGACY_SCAN_ID = Regex("^tt_[0-9a-f]{8}$")
 
         @Volatile
         private var instance: StickerStorageManager? = null
@@ -45,28 +55,44 @@ class StickerStorageManager private constructor(private val context: Context) {
     }
 
     private val contentsFile: File = File(baseDir, CONTENTS_FILE)
+    private val rejectedFile: File = File(baseDir, REJECTED_FILE)
 
     private val _packsFlow = MutableStateFlow<List<StickerPack>>(emptyList())
     val packsFlow: StateFlow<List<StickerPack>> = _packsFlow.asStateFlow()
 
+    private val rejected: MutableSet<String> = HashSet()
+
     init {
         loadPacks()
-        if (_packsFlow.value.isEmpty()) {
-            createSamplePacks()
+        loadRejected()
+        migrateFromV1IfNeeded()
+    }
+
+    fun getPacks(): List<StickerPack> = _packsFlow.value
+
+    fun getPack(packId: String): StickerPack? = _packsFlow.value.find { it.id == packId }
+
+    fun getPackDir(packId: String): File = File(baseDir, packId).apply { mkdirs() }
+
+    fun getStickerFile(packId: String, fileName: String): File = File(File(baseDir, packId), fileName)
+
+    /** Every real sticker id currently stored, across all packs. */
+    fun knownStickerIds(): Set<String> =
+        _packsFlow.value.flatMap { p -> p.stickers.filter { !it.isPadding && it.id.isNotEmpty() }.map { it.id } }.toHashSet()
+
+    /** Content ids that were examined and are not usable stickers; skipped quickly on later scans. */
+    @Synchronized
+    fun isRejected(id: String): Boolean = id in rejected
+
+    @Synchronized
+    fun markRejected(ids: Collection<String>) {
+        if (rejected.addAll(ids)) {
+            try {
+                rejectedFile.writeText(rejected.joinToString("\n"))
+            } catch (e: Exception) {
+                Log.w(TAG, "Could not persist rejected ids", e)
+            }
         }
-    }
-
-    fun getPacks(): List<StickerPack> {
-        return _packsFlow.value
-    }
-
-    fun getPack(packId: String): StickerPack? {
-        return _packsFlow.value.find { it.id == packId }
-    }
-
-    fun getStickerFile(packId: String, fileName: String): File {
-        val packDir = File(baseDir, packId)
-        return File(packDir, fileName)
     }
 
     @Synchronized
@@ -106,186 +132,45 @@ class StickerStorageManager private constructor(private val context: Context) {
             return
         }
         try {
-            val content = contentsFile.readText()
-            val list = json.decodeFromString<List<StickerPack>>(content)
-            _packsFlow.value = list
+            _packsFlow.value = json.decodeFromString<List<StickerPack>>(contentsFile.readText())
         } catch (e: Exception) {
             Log.e(TAG, "Error loading packs from $contentsFile", e)
             _packsFlow.value = emptyList()
         }
     }
 
+    private fun loadRejected() {
+        try {
+            if (rejectedFile.exists()) rejected.addAll(rejectedFile.readLines().filter { it.isNotBlank() })
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not read rejected ids", e)
+        }
+    }
+
     private fun persistPacks(packs: List<StickerPack>) {
         try {
-            val content = json.encodeToString(packs)
-            contentsFile.writeText(content)
+            contentsFile.writeText(json.encodeToString(packs))
             _packsFlow.value = packs
         } catch (e: Exception) {
             Log.e(TAG, "Error saving packs to $contentsFile", e)
         }
     }
 
-    /**
-     * Creates default sample packs so the user can immediately test WhatsApp transfer.
-     */
-    private fun createSamplePacks() {
-        try {
-            val samplePacks = mutableListOf<StickerPack>()
-
-            // 1. "TikTok Viral Memes" (Static Pack)
-            val pack1Id = "tiktok_viral_memes"
-            val pack1Dir = File(baseDir, pack1Id).apply { mkdirs() }
-            val pack1Tray = "tray_icon.png"
-            createColoredIcon(File(pack1Dir, pack1Tray), 96, 96, "TT", Color.parseColor("#FE2C55"))
-
-            val stickers1 = mutableListOf<Sticker>()
-            val sampleCaptions = listOf(
-                "POV 💀" to listOf("💀", "😭"),
-                "Wait For It ⏳" to listOf("⏳", "👀"),
-                "Real 💯" to listOf("💯", "🔥"),
-                "Cap 🧢" to listOf("🧢", "🤨"),
-                "Main Character ✨" to listOf("✨", "💅"),
-                "Viral Moment 🚀" to listOf("🚀", "🤩")
-            )
-
-            sampleCaptions.forEachIndexed { index, (caption, emojis) ->
-                val fileName = "sticker_${index + 1}.webp"
-                val file = File(pack1Dir, fileName)
-                createStickerBitmap(file, caption, Color.parseColor("#121212"), Color.parseColor("#FE2C55"))
-                stickers1.add(Sticker(imageFileName = fileName, emojis = emojis, sizeBytes = file.length()))
-            }
-
-            val pack1 = StickerPack(
-                id = pack1Id,
-                name = "TikTok Viral Memes",
-                publisher = "TikTok to WhatsApp",
-                trayImageFile = pack1Tray,
-                animatedStickerPack = false,
-                stickers = stickers1
-            )
-            samplePacks.add(pack1)
-
-            // 2. "TikTok Reactions" (Static Pack)
-            val pack2Id = "tiktok_reactions"
-            val pack2Dir = File(baseDir, pack2Id).apply { mkdirs() }
-            val pack2Tray = "tray_icon.png"
-            createColoredIcon(File(pack2Dir, pack2Tray), 96, 96, "RX", Color.parseColor("#25F4EE"))
-
-            val stickers2 = mutableListOf<Sticker>()
-            val reactions = listOf(
-                "Side Eye 😒" to listOf("😒", "👀"),
-                "Screaming 😱" to listOf("😱", "🚨"),
-                "No Way 🤯" to listOf("🤯", "💥"),
-                "Vibing 🎧" to listOf("🎧", "😎")
-            )
-            reactions.forEachIndexed { index, (caption, emojis) ->
-                val fileName = "reaction_${index + 1}.webp"
-                val file = File(pack2Dir, fileName)
-                createStickerBitmap(file, caption, Color.parseColor("#121212"), Color.parseColor("#25F4EE"))
-                stickers2.add(Sticker(imageFileName = fileName, emojis = emojis, sizeBytes = file.length()))
-            }
-
-            val pack2 = StickerPack(
-                id = pack2Id,
-                name = "TikTok Reactions",
-                publisher = "TikTok to WhatsApp",
-                trayImageFile = pack2Tray,
-                animatedStickerPack = false,
-                stickers = stickers2
-            )
-            samplePacks.add(pack2)
-
-            persistPacks(samplePacks)
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to create sample packs", e)
+    /** One-time cleanup of everything v1.0 invented: demo packs and the random-id scan packs. */
+    @Synchronized
+    private fun migrateFromV1IfNeeded() {
+        val marker = File(baseDir, MIGRATION_FILE)
+        if (marker.exists()) return
+        val doomed = _packsFlow.value.filter { p ->
+            p.id in LEGACY_SAMPLE_IDS ||
+                LEGACY_SCAN_PREFIXES.any { p.id.startsWith(it) } ||
+                (LEGACY_SCAN_ID.matches(p.id) && LEGACY_SCAN_NAME.matches(p.name))
         }
-    }
-
-    private fun createColoredIcon(file: File, width: Int, height: Int, text: String, bgColor: Int) {
-        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(bitmap)
-        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = bgColor
-            style = Paint.Style.FILL
+        if (doomed.isNotEmpty()) {
+            doomed.forEach { File(baseDir, it.id).deleteRecursively() }
+            persistPacks(_packsFlow.value - doomed.toSet())
+            Log.i(TAG, "Migration removed ${doomed.size} legacy packs")
         }
-        val radius = width / 4f
-        canvas.drawRoundRect(4f, 4f, (width - 4).toFloat(), (height - 4).toFloat(), radius, radius, paint)
-
-        val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.WHITE
-            textSize = width * 0.45f
-            textAlign = Paint.Align.CENTER
-            isFakeBoldText = true
-        }
-        val yPos = (height / 2f - (textPaint.descent() + textPaint.ascent()) / 2f)
-        canvas.drawText(text, width / 2f, yPos, textPaint)
-
-        FileOutputStream(file).use { out ->
-            bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
-        }
-        bitmap.recycle()
-    }
-
-    private fun createStickerBitmap(file: File, caption: String, bgColor: Int, accentColor: Int) {
-        // WhatsApp stickers must be exactly 512x512
-        val size = 512
-        val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(bitmap)
-
-        // 16px transparent margin around sticker
-        val contentPadding = 24f
-        val cardPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = bgColor
-            style = Paint.Style.FILL
-        }
-        val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = accentColor
-            style = Paint.Style.STROKE
-            strokeWidth = 14f
-        }
-
-        val rectRadius = 60f
-        canvas.drawRoundRect(
-            contentPadding,
-            contentPadding,
-            size - contentPadding,
-            size - contentPadding,
-            rectRadius,
-            rectRadius,
-            cardPaint
-        )
-        canvas.drawRoundRect(
-            contentPadding,
-            contentPadding,
-            size - contentPadding,
-            size - contentPadding,
-            rectRadius,
-            rectRadius,
-            borderPaint
-        )
-
-        // Watermark badge
-        val badgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = accentColor
-            textSize = 34f
-            textAlign = Paint.Align.CENTER
-            isFakeBoldText = true
-        }
-        canvas.drawText("TikTok Sticker", size / 2f, 110f, badgePaint)
-
-        // Caption text
-        val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.WHITE
-            textSize = 52f
-            textAlign = Paint.Align.CENTER
-            isFakeBoldText = true
-        }
-        val yPos = (size / 2f - (textPaint.descent() + textPaint.ascent()) / 2f) + 20f
-        canvas.drawText(caption, size / 2f, yPos, textPaint)
-
-        FileOutputStream(file).use { out ->
-            bitmap.compress(Bitmap.CompressFormat.WEBP, 90, out)
-        }
-        bitmap.recycle()
+        runCatching { marker.writeText("ok") }
     }
 }
