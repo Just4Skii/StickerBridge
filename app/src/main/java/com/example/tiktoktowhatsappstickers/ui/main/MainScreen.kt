@@ -4,7 +4,6 @@ import android.Manifest
 import android.content.ClipDescription
 import android.content.ClipboardManager
 import android.content.Context
-import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -28,18 +27,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.example.tiktoktowhatsappstickers.BuildConfig
-import com.example.tiktoktowhatsappstickers.core.shizuku.ShizukuBridge
 import com.example.tiktoktowhatsappstickers.data.model.StickerPack
 import com.example.tiktoktowhatsappstickers.theme.*
+import com.example.tiktoktowhatsappstickers.ui.grabber.TikTokWebGrabberDialog
 import com.example.tiktoktowhatsappstickers.ui.pack_detail.PackDetailDialog
 import java.io.File
 
@@ -56,31 +57,32 @@ fun MainScreen(
     var inputUrl by remember { mutableStateOf("") }
     val clipboardManager = androidx.compose.ui.platform.LocalClipboardManager.current
 
-    // Auto-detect TikTok link on clipboard when app opens
+    // Auto-fill copied TikTok video link if one is on clipboard
     LaunchedEffect(Unit) {
         val clip = clipboardManager.getText()?.text
-        if (!clip.isNullOrBlank() && (clip.contains("tiktok.com") || clip.contains("vm.tiktok.com"))) {
+        if (!clip.isNullOrBlank() && (clip.contains("tiktok.com") || clip.contains("ibyteimg.com"))) {
             inputUrl = clip.trim()
         }
     }
 
-    // Photo/GIF/WebP Picker Launcher
     val mediaPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickMultipleVisualMedia(maxItems = 30)
     ) { uris: List<Uri> ->
-        if (uris.isNotEmpty()) {
-            viewModel.importFromMediaUris(uris)
-        }
+        if (uris.isNotEmpty()) viewModel.importFromMediaUris(uris)
     }
 
-    // SAF Document Tree Folder Picker (pre-targeted at TikTok's Android/data folder)
+    val documentPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenMultipleDocuments()
+    ) { uris: List<Uri> ->
+        if (uris.isNotEmpty()) viewModel.scanSelectedFiles(uris)
+    }
+
     val folderPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocumentTree()
     ) { uri: Uri? ->
         viewModel.onFolderGranted(uri)
     }
 
-    // Legacy Storage Permission Launcher (Android 8 - 9)
     val storagePermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { granted: Boolean ->
@@ -96,16 +98,11 @@ fun MainScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        // App Brand Badge
                         Box(
                             modifier = Modifier
-                                .size(40.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(
-                                    Brush.linearGradient(
-                                        listOf(TikTokPink, TikTokCyan)
-                                    )
-                                ),
+                                .size(38.dp)
+                                .clip(RoundedCornerShape(11.dp))
+                                .background(Brush.linearGradient(listOf(TikTokPink, TikTokCyan))),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
@@ -119,67 +116,51 @@ fun MainScreen(
                         Spacer(modifier = Modifier.width(10.dp))
 
                         Column(modifier = Modifier.weight(1f)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    text = "TikTok",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Black,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Text(
-                                    text = " ➔ ",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = TikTokPink,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    text = "WhatsApp",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Black,
-                                    color = WhatsAppGreen
-                                )
-                            }
                             Text(
-                                text = "v${BuildConfig.VERSION_NAME} • 512×512 Deduplicated Engine",
+                                text = "StickerBridge",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "v${BuildConfig.VERSION_NAME} • TikTok → WhatsApp (512×512)",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
 
-                        // Check for App Update Icon Button
                         IconButton(
                             onClick = { viewModel.checkForUpdate(manual = true) },
-                            modifier = Modifier.size(36.dp)
+                            modifier = Modifier.size(34.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.SystemUpdateAlt,
                                 contentDescription = "Check for Updates",
                                 tint = TikTokCyan,
-                                modifier = Modifier.size(20.dp)
+                                modifier = Modifier.size(19.dp)
                             )
                         }
 
                         Spacer(modifier = Modifier.width(4.dp))
 
-                        // WhatsApp Status Pill
                         Surface(
                             shape = RoundedCornerShape(20.dp),
                             color = if (uiState.isWhatsAppInstalled) WhatsAppGreen.copy(alpha = 0.15f) else MaterialTheme.colorScheme.errorContainer,
                             modifier = Modifier.padding(end = 8.dp)
                         ) {
                             Row(
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Box(
                                     modifier = Modifier
-                                        .size(7.dp)
+                                        .size(6.dp)
                                         .background(
                                             if (uiState.isWhatsAppInstalled) WhatsAppGreen else MaterialTheme.colorScheme.error,
                                             CircleShape
                                         )
                                 )
-                                Spacer(modifier = Modifier.width(6.dp))
+                                Spacer(modifier = Modifier.width(5.dp))
                                 Text(
                                     text = if (uiState.isWhatsAppInstalled) "WA Ready" else "No WA",
                                     style = MaterialTheme.typography.labelSmall,
@@ -201,7 +182,6 @@ fun MainScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // OTA Update Banner (shown when a new version is published in update.json)
             UpdateBanner(
                 updateUi = uiState.update,
                 updateCheckMessage = uiState.updateCheckMessage,
@@ -209,159 +189,152 @@ fun MainScreen(
                 onDismissMessage = { viewModel.dismissUpdateMessage() }
             )
 
-            // Import Studio Card
+            // Clean, intuitive source chooser card (Zero 3rd-party apps)
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 8.dp),
-                shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                ),
+                shape = RoundedCornerShape(22.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 border = androidx.compose.foundation.BorderStroke(
                     1.dp,
-                    Brush.horizontalGradient(listOf(TikTokPink.copy(alpha = 0.5f), TikTokCyan.copy(alpha = 0.5f)))
+                    Brush.horizontalGradient(listOf(TikTokPink.copy(alpha = 0.45f), TikTokCyan.copy(alpha = 0.45f)))
                 ),
-                elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(16.dp)
                 ) {
+                    // Section 1: Grab Stickers from a Video Comment Section
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
-                            imageVector = Icons.Default.AddReaction,
+                            imageVector = Icons.Default.Forum,
                             contentDescription = null,
                             tint = TikTokPink,
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(18.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Fetch & Convert TikTok Stickers",
-                            style = MaterialTheme.typography.titleMedium,
+                            text = "Pull Stickers from Video Comments",
+                            style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.ExtraBold
                         )
                     }
-
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(3.dp))
                     Text(
-                        text = "Scan TikTok's sticker cache directly, or import from a link / gallery. Every sticker gets a unique ID and is scaled to 512×512.",
+                        text = "Paste or share a TikTok video link to open its comments and grab every sticker automatically.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    // 1-Click Automatic TikTok Sticker Scanner
-                    Button(
-                        onClick = { viewModel.scanTikTok() },
-                        enabled = !uiState.isImporting,
-                        shape = RoundedCornerShape(14.dp),
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = TikTokCyan,
-                            contentColor = Color.Black
-                        )
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.AutoFixHigh,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                            tint = Color.Black
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "⚡ 1-Tap Fetch TikTok Stickers",
-                            fontWeight = FontWeight.ExtraBold,
-                            color = Color.Black
-                        )
-                    }
-
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    // Input Field for Link
-                    OutlinedTextField(
-                        value = inputUrl,
-                        onValueChange = { inputUrl = it },
-                        modifier = Modifier.fillMaxWidth(),
-                        placeholder = { Text("Paste TikTok link or direct sticker URL…") },
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = TikTokPink,
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outline
-                        ),
-                        trailingIcon = {
-                            if (inputUrl.isNotEmpty()) {
-                                IconButton(onClick = { inputUrl = "" }) {
-                                    Icon(imageVector = Icons.Default.Clear, contentDescription = "Clear")
-                                }
-                            } else {
-                                IconButton(onClick = {
-                                    val clipboard =
-                                        context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                    if (clipboard.hasPrimaryClip() &&
-                                        clipboard.primaryClipDescription?.hasMimeType(ClipDescription.MIMETYPE_TEXT_PLAIN) == true
-                                    ) {
-                                        val text = clipboard.primaryClip?.getItemAt(0)?.text?.toString() ?: ""
-                                        if (text.startsWith("http")) {
-                                            inputUrl = text
-                                        }
-                                    }
-                                }) {
-                                    Icon(
-                                        imageVector = Icons.Default.ContentPaste,
-                                        contentDescription = "Paste",
-                                        tint = TikTokCyan
-                                    )
-                                }
-                            }
-                        },
-                        shape = RoundedCornerShape(14.dp)
-                    )
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    // Action Buttons Row
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Button(
-                            onClick = {
-                                if (inputUrl.isNotBlank()) {
-                                    viewModel.importTikTokUrl(inputUrl)
-                                    inputUrl = ""
+                        OutlinedTextField(
+                            value = inputUrl,
+                            onValueChange = { inputUrl = it },
+                            modifier = Modifier.weight(1f),
+                            placeholder = { Text("Paste TikTok video link…", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                            singleLine = true,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = TikTokPink,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                            ),
+                            trailingIcon = {
+                                if (inputUrl.isNotEmpty()) {
+                                    IconButton(onClick = { inputUrl = "" }) {
+                                        Icon(imageVector = Icons.Default.Clear, contentDescription = "Clear")
+                                    }
+                                } else {
+                                    IconButton(onClick = {
+                                        val clipboard =
+                                            context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                        if (clipboard.hasPrimaryClip() &&
+                                            clipboard.primaryClipDescription?.hasMimeType(ClipDescription.MIMETYPE_TEXT_PLAIN) == true
+                                        ) {
+                                            val text = clipboard.primaryClip?.getItemAt(0)?.text?.toString() ?: ""
+                                            if (text.contains("http")) inputUrl = text.trim()
+                                        }
+                                    }) {
+                                        Icon(
+                                            imageVector = Icons.Default.ContentPaste,
+                                            contentDescription = "Paste",
+                                            tint = TikTokCyan
+                                        )
+                                    }
                                 }
                             },
+                            shape = RoundedCornerShape(14.dp)
+                        )
+
+                        Button(
+                            onClick = {
+                                viewModel.openVideoCommentsGrabber(inputUrl)
+                                inputUrl = ""
+                            },
                             enabled = inputUrl.isNotBlank() && !uiState.isImporting,
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.height(54.dp),
                             shape = RoundedCornerShape(14.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = TikTokPink)
                         ) {
-                            Icon(imageVector = Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Import Link", fontWeight = FontWeight.Bold)
+                            Icon(imageVector = Icons.Default.Search, contentDescription = "Grab Comments", tint = Color.White)
                         }
+                    }
 
-                        OutlinedButton(
+                    Spacer(modifier = Modifier.height(14.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Section 2: Saved / Favorited Stickers & Local Imports
+                    Text(
+                        text = "Other Ways to Import",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        QuickSourceTile(
+                            modifier = Modifier.weight(1f),
+                            icon = Icons.Default.ChatBubbleOutline,
+                            label = "DMs &\nSaved",
+                            accent = TikTokCyan,
+                            enabled = !uiState.isImporting,
+                            onClick = { viewModel.openTikTokLiveBrowser() }
+                        )
+                        QuickSourceTile(
+                            modifier = Modifier.weight(1f),
+                            icon = Icons.Default.FolderOpen,
+                            label = "Device\nCache",
+                            accent = TikTokPink,
+                            enabled = !uiState.isImporting,
+                            onClick = { viewModel.scanTikTokCache() }
+                        )
+                        QuickSourceTile(
+                            modifier = Modifier.weight(1f),
+                            icon = Icons.Default.PhotoLibrary,
+                            label = "Gallery\n/ GIFs",
+                            accent = WhatsAppGreen,
+                            enabled = !uiState.isImporting,
                             onClick = {
                                 mediaPickerLauncher.launch(
                                     PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                                 )
-                            },
-                            enabled = !uiState.isImporting,
-                            shape = RoundedCornerShape(14.dp),
-                            modifier = Modifier.weight(1f),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
-                        ) {
-                            Icon(imageVector = Icons.Default.PhotoLibrary, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Gallery Import", fontWeight = FontWeight.SemiBold)
-                        }
+                            }
+                        )
                     }
 
-                    // Loading State
+                    // Progress indicator
                     AnimatedVisibility(visible = uiState.isImporting) {
                         Column(modifier = Modifier.padding(top = 12.dp)) {
                             LinearProgressIndicator(
@@ -380,7 +353,6 @@ fun MainScreen(
                         }
                     }
 
-                    // Info / Deduplication Alert
                     uiState.infoMessage?.let { info ->
                         Spacer(modifier = Modifier.height(10.dp))
                         Card(
@@ -393,11 +365,7 @@ fun MainScreen(
                                     .padding(10.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.CheckCircle,
-                                    contentDescription = null,
-                                    tint = WhatsAppGreen
-                                )
+                                Icon(imageVector = Icons.Default.CheckCircle, contentDescription = null, tint = WhatsAppGreen)
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
                                     text = info,
@@ -406,18 +374,12 @@ fun MainScreen(
                                     modifier = Modifier.weight(1f)
                                 )
                                 IconButton(onClick = { viewModel.clearInfo() }, modifier = Modifier.size(28.dp)) {
-                                    Icon(
-                                        imageVector = Icons.Default.Close,
-                                        contentDescription = "Dismiss",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(16.dp)
-                                    )
+                                    Icon(imageVector = Icons.Default.Close, contentDescription = "Dismiss", modifier = Modifier.size(16.dp))
                                 }
                             }
                         }
                     }
 
-                    // Error Alert
                     uiState.errorMessage?.let { error ->
                         Spacer(modifier = Modifier.height(10.dp))
                         Card(
@@ -430,11 +392,7 @@ fun MainScreen(
                                     .padding(10.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.ErrorOutline,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.error
-                                )
+                                Icon(imageVector = Icons.Default.ErrorOutline, contentDescription = null, tint = MaterialTheme.colorScheme.error)
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
                                     text = error,
@@ -443,12 +401,7 @@ fun MainScreen(
                                     modifier = Modifier.weight(1f)
                                 )
                                 IconButton(onClick = { viewModel.clearError() }, modifier = Modifier.size(28.dp)) {
-                                    Icon(
-                                        imageVector = Icons.Default.Close,
-                                        contentDescription = "Dismiss",
-                                        tint = MaterialTheme.colorScheme.error,
-                                        modifier = Modifier.size(16.dp)
-                                    )
+                                    Icon(imageVector = Icons.Default.Close, contentDescription = "Dismiss", modifier = Modifier.size(16.dp))
                                 }
                             }
                         }
@@ -456,7 +409,7 @@ fun MainScreen(
                 }
             }
 
-            // Section Header
+            // Library Header
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -477,7 +430,6 @@ fun MainScreen(
                 )
             }
 
-            // Sticker Packs List or Honest Empty State
             if (uiState.packs.isEmpty()) {
                 Box(
                     modifier = Modifier
@@ -493,16 +445,15 @@ fun MainScreen(
                             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
                             modifier = Modifier.size(48.dp)
                         )
-                        Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(10.dp))
                         Text(
                             text = "No Sticker Packs Yet",
                             style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
+                            fontWeight = FontWeight.Bold
                         )
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
-                            text = "Open TikTok, view or favorite your stickers in DMs or comments, then tap '1-Tap Fetch TikTok Stickers' above.",
+                            text = "Share or paste a TikTok video link to extract comment stickers, open DMs & Saved to grab your own stickers live, or pick from Gallery.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center
@@ -529,7 +480,19 @@ fun MainScreen(
         }
     }
 
-    // Detail Dialog Preview
+    // Live TikTok Comment / DM Sticker Grabber (WebView - zero 3rd party apps)
+    uiState.grabberSession?.let { session ->
+        TikTokWebGrabberDialog(
+            initialUrl = session.url,
+            title = session.title,
+            onDismiss = { viewModel.closeGrabber() },
+            onImportStickers = { packName, raws ->
+                viewModel.importCapturedStickers(packName, raws)
+            }
+        )
+    }
+
+    // Pack Detail Dialog
     uiState.selectedPack?.let { pack ->
         PackDetailDialog(
             pack = pack,
@@ -539,27 +502,71 @@ fun MainScreen(
         )
     }
 
-    // One-time Access Setup Dialog (Storage Permission / Folder Grant / Shizuku)
+    // Native OS Access Prompts (No 3rd-party apps)
     uiState.accessPrompt?.let { prompt ->
         AccessSetupDialog(
             prompt = prompt,
             onDismiss = { viewModel.dismissAccessPrompt() },
             onRequestStoragePermission = {
                 viewModel.dismissAccessPrompt()
-                storagePermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                storagePermissionLauncher.launch(Manifest.permission.READ_EXTERNAL_STORAGE)
             },
             onLaunchFolderPicker = { suggestedUri ->
                 viewModel.dismissAccessPrompt()
                 folderPickerLauncher.launch(suggestedUri)
             },
-            onRequestShizukuPermission = {
-                viewModel.requestShizukuPermission()
+            onOpenLiveBrowser = {
+                viewModel.dismissAccessPrompt()
+                viewModel.openTikTokLiveBrowser()
             },
-            onRefreshShizuku = {
-                viewModel.refreshAccessPrompt()
-                viewModel.scanTikTok()
+            onOpenSystemFiles = {
+                viewModel.dismissAccessPrompt()
+                runCatching {
+                    context.startActivity(viewModel.systemFilesIntent())
+                }.onFailure {
+                    documentPickerLauncher.launch(arrayOf("*/*"))
+                }
+            },
+            onPickCacheFiles = {
+                viewModel.dismissAccessPrompt()
+                documentPickerLauncher.launch(arrayOf("*/*"))
             }
         )
+    }
+}
+
+@Composable
+private fun QuickSourceTile(
+    modifier: Modifier = Modifier,
+    icon: ImageVector,
+    label: String,
+    accent: Color,
+    enabled: Boolean,
+    onClick: () -> Unit
+) {
+    Surface(
+        modifier = modifier
+            .clip(RoundedCornerShape(14.dp))
+            .clickable(enabled = enabled, onClick = onClick),
+        shape = RoundedCornerShape(14.dp),
+        color = accent.copy(alpha = 0.12f),
+        border = androidx.compose.foundation.BorderStroke(1.dp, accent.copy(alpha = 0.35f))
+    ) {
+        Column(
+            modifier = Modifier.padding(vertical = 10.dp, horizontal = 6.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Icon(imageVector = icon, contentDescription = null, tint = accent, modifier = Modifier.size(22.dp))
+            Spacer(modifier = Modifier.height(5.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.Center,
+                lineHeight = MaterialTheme.typography.labelSmall.lineHeight
+            )
+        }
     }
 }
 
@@ -586,18 +593,13 @@ private fun UpdateBanner(
                         .padding(12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.SystemUpdate,
-                        contentDescription = null,
-                        tint = WhatsAppGreen
-                    )
+                    Icon(imageVector = Icons.Default.SystemUpdate, contentDescription = null, tint = WhatsAppGreen)
                     Spacer(modifier = Modifier.width(10.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = "Update v${updateUi.info.versionName} Available",
                             style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
+                            fontWeight = FontWeight.Bold
                         )
                         if (updateUi.info.changelog.isNotEmpty()) {
                             Text(
@@ -663,7 +665,7 @@ private fun UpdateBanner(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "v${updateUi.info.versionName} downloaded & verified",
+                        text = "v${updateUi.info.versionName} verified & ready",
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.weight(1f)
@@ -747,17 +749,17 @@ private fun AccessSetupDialog(
     onDismiss: () -> Unit,
     onRequestStoragePermission: () -> Unit,
     onLaunchFolderPicker: (Uri) -> Unit,
-    onRequestShizukuPermission: () -> Unit,
-    onRefreshShizuku: () -> Unit
+    onOpenLiveBrowser: () -> Unit,
+    onOpenSystemFiles: () -> Unit,
+    onPickCacheFiles: () -> Unit
 ) {
-    val context = LocalContext.current
     when (prompt) {
         AccessPrompt.StoragePermission -> {
             AlertDialog(
                 onDismissRequest = onDismiss,
                 title = { Text("Allow Storage Access", fontWeight = FontWeight.Bold) },
                 text = {
-                    Text("StickerBridge needs storage permission once to read TikTok's cached stickers on your device.")
+                    Text("StickerBridge needs storage permission once to scan TikTok's cached stickers on your phone.")
                 },
                 confirmButton = {
                     Button(
@@ -775,11 +777,10 @@ private fun AccessSetupDialog(
         is AccessPrompt.FolderGrant -> {
             AlertDialog(
                 onDismissRequest = onDismiss,
-                title = { Text("One-Time TikTok Folder Grant", fontWeight = FontWeight.Bold) },
+                title = { Text("One-Time Folder Access", fontWeight = FontWeight.Bold) },
                 text = {
                     Text(
-                        "Android protects app folders until you approve them once.\n\n" +
-                            "On the next screen, tap 'Use this folder' at the bottom so StickerBridge can read TikTok's sticker cache automatically from now on."
+                        "Tap 'Use this folder' on the next screen so StickerBridge can scan TikTok's sticker cache automatically."
                     )
                 },
                 confirmButton = {
@@ -787,7 +788,7 @@ private fun AccessSetupDialog(
                         onClick = { onLaunchFolderPicker(prompt.suggested) },
                         colors = ButtonDefaults.buttonColors(containerColor = TikTokCyan)
                     ) {
-                        Text("Open TikTok Folder", color = Color.Black, fontWeight = FontWeight.Bold)
+                        Text("Open Folder", color = Color.Black, fontWeight = FontWeight.Bold)
                     }
                 },
                 dismissButton = {
@@ -795,107 +796,51 @@ private fun AccessSetupDialog(
                 }
             )
         }
-        is AccessPrompt.Shizuku -> {
+        AccessPrompt.Android13FilesHelper -> {
             AlertDialog(
                 onDismissRequest = onDismiss,
-                title = { Text("Unlock TikTok Sticker Cache (Android 13+)", fontWeight = FontWeight.Bold) },
+                title = { Text("Android 13+ Privacy Lock", fontWeight = FontWeight.Bold) },
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(
-                            "On Android 13+, Google blocks regular apps and the system file picker from opening another app's Android/data folder.",
+                            "Android 13+ blocks apps from silently scanning another app's Android/data folder. Without any 3rd-party app, you have two built-in options:",
                             style = MaterialTheme.typography.bodySmall
                         )
-                        when (prompt.state) {
-                            ShizukuBridge.State.NOT_INSTALLED -> {
-                                Text(
-                                    "To read TikTok's internal sticker cache without root, install the free Shizuku helper once and enable Wireless Debugging:",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-                            ShizukuBridge.State.NOT_RUNNING -> {
-                                Text(
-                                    "Shizuku is installed on your phone, but isn't running yet. Open Shizuku, tap 'Start via Wireless debugging', then return here.",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-                            ShizukuBridge.State.NEEDS_PERMISSION -> {
-                                Text(
-                                    "Shizuku is running! Tap 'Allow in Shizuku' below to let StickerBridge read TikTok's sticker cache in 1 tap.",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-                            ShizukuBridge.State.READY -> {
-                                Text(
-                                    "Shizuku is ready! Tap 'Scan Now' to fetch your TikTok stickers.",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-                        }
-                        if (prompt.folderGrantAlsoPossible) {
-                            Spacer(modifier = Modifier.height(4.dp))
-                            OutlinedButton(
-                                onClick = { onLaunchFolderPicker(prompt.suggested) },
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text("Try System Folder Picker Instead")
-                            }
-                        }
+                        Text(
+                            "1. DMs & Saved Grabber (Recommended): Open your TikTok chats/comments inside StickerBridge to capture animated stickers live.",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            "2. Built-in Android Files: Open Android/data/com.zhiliaoapp.musically/cache/picture/fresco_custom_cache, select .cnt files, and Share → StickerBridge.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
                     }
                 },
                 confirmButton = {
-                    when (prompt.state) {
-                        ShizukuBridge.State.NOT_INSTALLED -> {
-                            Button(
-                                onClick = {
-                                    val market = Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=${ShizukuBridge.PACKAGE}"))
-                                    val web = Intent(Intent.ACTION_VIEW, Uri.parse(ShizukuBridge.RELEASES_URL))
-                                    runCatching { context.startActivity(market) }.onFailure { context.startActivity(web) }
-                                },
-                                colors = ButtonDefaults.buttonColors(containerColor = TikTokCyan)
-                            ) {
-                                Text("Install Shizuku (Free)", color = Color.Black, fontWeight = FontWeight.Bold)
-                            }
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+                        Button(
+                            onClick = onOpenLiveBrowser,
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(containerColor = TikTokCyan)
+                        ) {
+                            Text("Open DMs & Saved Grabber", color = Color.Black, fontWeight = FontWeight.Bold)
                         }
-                        ShizukuBridge.State.NOT_RUNNING -> {
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                OutlinedButton(onClick = onRefreshShizuku) {
-                                    Text("I Started It")
-                                }
-                                Button(
-                                    onClick = {
-                                        val launch = context.packageManager.getLaunchIntentForPackage(ShizukuBridge.PACKAGE)
-                                        if (launch != null) context.startActivity(launch)
-                                    },
-                                    colors = ButtonDefaults.buttonColors(containerColor = TikTokCyan)
-                                ) {
-                                    Text("Open Shizuku", color = Color.Black, fontWeight = FontWeight.Bold)
-                                }
-                            }
+                        OutlinedButton(
+                            onClick = onOpenSystemFiles,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Open Built-In Android Files")
                         }
-                        ShizukuBridge.State.NEEDS_PERMISSION -> {
-                            Button(
-                                onClick = onRequestShizukuPermission,
-                                colors = ButtonDefaults.buttonColors(containerColor = TikTokCyan)
-                            ) {
-                                Text("Allow in Shizuku", color = Color.Black, fontWeight = FontWeight.Bold)
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            TextButton(onClick = onPickCacheFiles) {
+                                Text("Pick Files")
                             }
-                        }
-                        ShizukuBridge.State.READY -> {
-                            Button(
-                                onClick = onRefreshShizuku,
-                                colors = ButtonDefaults.buttonColors(containerColor = TikTokCyan)
-                            ) {
-                                Text("Scan Now", color = Color.Black, fontWeight = FontWeight.Bold)
+                            TextButton(onClick = onDismiss) {
+                                Text("Close")
                             }
                         }
                     }
-                },
-                dismissButton = {
-                    TextButton(onClick = onDismiss) { Text("Close") }
                 }
             )
         }
@@ -929,12 +874,10 @@ fun StickerPackCard(
                 .fillMaxWidth()
                 .padding(14.dp)
         ) {
-            // Main Row
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Tray Icon
                 Box(
                     modifier = Modifier
                         .size(56.dp)
@@ -952,7 +895,6 @@ fun StickerPackCard(
 
                 Spacer(modifier = Modifier.width(14.dp))
 
-                // Title & Details
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = pack.name,
@@ -989,7 +931,6 @@ fun StickerPackCard(
 
                 Spacer(modifier = Modifier.width(8.dp))
 
-                // WhatsApp Transfer Button
                 Button(
                     onClick = onAddToWhatsApp,
                     colors = ButtonDefaults.buttonColors(
@@ -999,40 +940,19 @@ fun StickerPackCard(
                     contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
                 ) {
                     if (pack.isAddedToWhatsApp) {
-                        Icon(
-                            imageVector = Icons.Default.Check,
-                            contentDescription = "Added",
-                            tint = WhatsAppGreen,
-                            modifier = Modifier.size(16.dp)
-                        )
+                        Icon(imageVector = Icons.Default.Check, contentDescription = "Added", tint = WhatsAppGreen, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            "Added",
-                            color = WhatsAppGreen,
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Text("Added", color = WhatsAppGreen, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
                     } else {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = "Add",
-                            tint = Color.White,
-                            modifier = Modifier.size(16.dp)
-                        )
+                        Icon(imageVector = Icons.Default.Add, contentDescription = "Add", tint = Color.White, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            "Add",
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold,
-                            style = MaterialTheme.typography.labelMedium
-                        )
+                        Text("Add", color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium)
                     }
                 }
             }
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Sticker Thumbnails Preview Carousel
             LazyRow(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)

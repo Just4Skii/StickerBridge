@@ -1,28 +1,32 @@
 package com.example.tiktoktowhatsappstickers.core.scanner
 
 import android.Manifest
+import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.DocumentsContract
 import android.util.Log
 import androidx.core.content.ContextCompat
-import com.example.tiktoktowhatsappstickers.core.shizuku.ShizukuBridge
 import com.example.tiktoktowhatsappstickers.data.model.StickerPack
 import com.example.tiktoktowhatsappstickers.data.storage.StickerLibrary
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-/** What the app has to do before it can read TikTok's stickers on this particular phone. */
+/** What the app can use to read TikTok's local cache without any 3rd-party app. */
 sealed class Route {
     data class Ready(val source: TikTokSource) : Route()
-    /** Android 8-9: ask for the normal storage permission. */
+    /** Android 8-9: standard storage permission. */
     object NeedStoragePermission : Route()
-    /** Android 10-12: user grants TikTok's folder once through the system picker. */
+    /** Android 10-12: built-in system folder grant on TikTok's cache folder. */
     object NeedFolderGrant : Route()
-    /** Android 11+: one-time Shizuku setup (the only no-root route on Android 13+). */
-    data class NeedShizuku(val state: ShizukuBridge.State, val folderGrantAlsoPossible: Boolean) : Route()
+    /**
+     * Android 13+: Android locks other apps out of /Android/data unless accessed via the built-in
+     * Android Files app or via StickerBridge's live in-app TikTok Grabber.
+     */
+    object Android13Restricted : Route()
 }
 
 class TikTokCacheScanner(private val context: Context) {
@@ -69,42 +73,55 @@ class TikTokCacheScanner(private val context: Context) {
             if (saf.isReadable()) return@withContext Route.Ready(saf)
         }
 
-        val shizuku = ShizukuBridge.state(context)
-        if (shizuku == ShizukuBridge.State.READY) {
-            ShizukuBridge.connect()?.let { return@withContext Route.Ready(ShizukuSource(it)) }
-        }
-
         when {
             Build.VERSION.SDK_INT <= 28 -> {
                 val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.READ_EXTERNAL_STORAGE) ==
                     PackageManager.PERMISSION_GRANTED
                 if (granted) Route.Ready(direct) else Route.NeedStoragePermission
             }
-            Build.VERSION.SDK_INT <= 32 -> {
-                // Shizuku is a valid alternative here, but the folder grant is the easier first try.
-                if (savedTree() == null) Route.NeedFolderGrant
-                else Route.NeedShizuku(shizuku, folderGrantAlsoPossible = true)
-            }
-            else -> Route.NeedShizuku(shizuku, folderGrantAlsoPossible = false)
+            Build.VERSION.SDK_INT <= 32 -> Route.NeedFolderGrant
+            else -> Route.Android13Restricted
         }
     }
 
-    /** Where the folder picker should open: straight at TikTok's folder. */
+    /** Deep URI directly inside TikTok's sticker cache folder. */
     fun suggestedFolderUri(): Uri {
         val pkg = installedTikTokPackage() ?: CandidateRules.PACKAGES.first()
-        return DocumentsContract.buildDocumentUri(EXTERNAL_STORAGE_AUTHORITY, "primary:Android/data/$pkg")
+        return DocumentsContract.buildDocumentUri(
+            EXTERNAL_STORAGE_AUTHORITY,
+            "primary:Android/data/$pkg/cache/picture/fresco_custom_cache"
+        )
+    }
+
+    /**
+     * Opens Android's built-in System Files app (`com.google.android.documentsui`) straight at TikTok's
+     * sticker cache folder so users on Android 13+ can select & Share `.cnt` files to StickerBridge
+     * without installing any 3rd-party app.
+     */
+    fun systemFilesIntent(): Intent {
+        val pkg = installedTikTokPackage() ?: CandidateRules.PACKAGES.first()
+        val folderUri = DocumentsContract.buildDocumentUri(
+            EXTERNAL_STORAGE_AUTHORITY,
+            "primary:Android/data/$pkg/cache/picture/fresco_custom_cache"
+        )
+        return Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(folderUri, "vnd.android.document/directory")
+            component = ComponentName(
+                "com.google.android.documentsui",
+                "com.android.documentsui.files.FilesActivity"
+            )
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
     }
 
     fun saveFolderGrant(uri: Uri) {
         try {
-            context.contentResolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
         } catch (e: Exception) {
             Log.w(TAG, "Could not persist folder grant", e)
         }
         prefs.edit().putString(KEY_TREE, uri.toString()).apply()
     }
-
-    fun clearFolderGrant() = prefs.edit().remove(KEY_TREE).apply()
 
     private fun savedTree(): Uri? {
         val s = prefs.getString(KEY_TREE, null) ?: return null
@@ -115,10 +132,6 @@ class TikTokCacheScanner(private val context: Context) {
 
     // ------------------------------------------------------------------ scanning
 
-    /**
-     * Reads every candidate file in [source], keeps only genuine stickers, and merges them into the
-     * library. Stickers already stored (by content id) are skipped, so scanning twice never duplicates.
-     */
     suspend fun scan(source: TikTokSource, onProgress: (String) -> Unit): ScanResult = withContext(Dispatchers.IO) {
         var examined = 0
         var found = 0
@@ -144,7 +157,7 @@ class TikTokCacheScanner(private val context: Context) {
                 examined++
                 if (examined % 25 == 0) onProgress("Checked $examined files, found $found stickers…")
                 val bytes = c.read() ?: continue
-                if (!StickerClassifier.classify(bytes, c.path).accept) continue
+                if (!StickerClassifier.classify(bytes, c.path, c.hintUrl).accept) continue
                 found++
                 batch += StickerLibrary.Raw(c.key, bytes)
                 if (batch.size >= BATCH) flush()
@@ -156,10 +169,9 @@ class TikTokCacheScanner(private val context: Context) {
         }
 
         val message = when {
-            examined == 0 -> "Couldn't see any TikTok files via ${source.label}. Is TikTok installed and logged in on this phone?"
-            found == 0 -> "Checked $examined files in TikTok's cache but none were stickers. TikTok only keeps stickers it has " +
-                "shown you: open TikTok → a chat → the sticker panel → ⭐ Favorites, scroll through them once, then scan again."
-            added == 0 && already > 0 -> "No new stickers. All $already are already in your library."
+            examined == 0 -> "Couldn't read files via ${source.label}. Use the Live TikTok Grabber tab to capture comment or chat stickers directly."
+            found == 0 -> "Checked $examined files but none were stickers. View or favorite your stickers in TikTok first, then try again."
+            added == 0 && already > 0 -> "No new stickers found — all $already are already in your library."
             else -> null
         }
         ScanResult(examined, found, added, already, unusable, touched.values.toList(), source.label, message)

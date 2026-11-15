@@ -98,11 +98,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    override fun onResume() {
-        super.onResume()
-        viewModel.refreshAccessPrompt()
-    }
-
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         handleIncomingIntent(intent)
@@ -120,26 +115,29 @@ class MainActivity : ComponentActivity() {
             Intent.ACTION_SEND -> {
                 if (type == "text/plain") {
                     val sharedText = intent.getStringExtra(Intent.EXTRA_TEXT) ?: ""
-                    val urlPattern = Regex("https?://\\S+")
-                    val match = urlPattern.find(sharedText)
-                    val url = match?.value ?: sharedText
-                    if (url.startsWith("http")) {
-                        viewModel.importTikTokUrl(url)
+                    if (sharedText.contains("http")) {
+                        viewModel.openVideoCommentsGrabber(sharedText)
                     }
-                } else if (type.startsWith("image/") || type.startsWith("video/")) {
+                } else {
                     @Suppress("DEPRECATION")
                     val uri = intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM)
                     if (uri != null) {
-                        viewModel.importFromMediaUris(listOf(uri), "Shared Media Pack")
+                        if (type == "application/octet-stream" || type == "*/*") {
+                            viewModel.scanSelectedFiles(listOf(uri))
+                        } else if (type.startsWith("image/")) {
+                            viewModel.importFromMediaUris(listOf(uri), "Shared Stickers")
+                        }
                     }
                 }
             }
             Intent.ACTION_SEND_MULTIPLE -> {
-                if (type.startsWith("image/")) {
-                    @Suppress("DEPRECATION")
-                    val uris = intent.getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM)
-                    if (!uris.isNullOrEmpty()) {
-                        viewModel.importFromMediaUris(uris, "Shared Media Pack")
+                @Suppress("DEPRECATION")
+                val uris = intent.getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM)
+                if (!uris.isNullOrEmpty()) {
+                    if (type == "application/octet-stream" || type == "*/*") {
+                        viewModel.scanSelectedFiles(uris)
+                    } else if (type.startsWith("image/")) {
+                        viewModel.importFromMediaUris(uris, "Shared Stickers")
                     }
                 }
             }

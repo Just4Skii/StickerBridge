@@ -5,13 +5,22 @@ import android.net.Uri
 import android.os.Environment
 import android.provider.DocumentsContract
 import android.util.Log
-import com.example.tiktoktowhatsappstickers.core.shizuku.IFileService
 import java.io.File
 
-/** One file that might be a sticker. [key] is TikTok's own cache key (the file name without extension). */
-class Candidate(val key: String, val path: String, val size: Long, val read: () -> ByteArray?)
+/**
+ * One file that might be a sticker.
+ * [key] is TikTok's own cache key (the file name without extension).
+ * [hintUrl] is the optional CDN URL extracted from TikTok's image_config directory.
+ */
+class Candidate(
+    val key: String,
+    val path: String,
+    val size: Long,
+    val hintUrl: String? = null,
+    val read: () -> ByteArray?
+)
 
-/** A way of looking inside TikTok's storage. Which one works depends on the Android version. */
+/** A way of looking inside TikTok's storage on versions of Android that allow it natively. */
 interface TikTokSource {
     val label: String
     fun candidates(): Sequence<Candidate>
@@ -19,7 +28,21 @@ interface TikTokSource {
 
 private fun keyOf(name: String) = name.substringBeforeLast('.')
 
-/** Plain file access. Works on Android 8-9, and anywhere the OS happens to allow it. */
+private fun extractHintUrl(bytes: ByteArray?): String? {
+    if (bytes == null || bytes.isEmpty()) return null
+    val text = String(bytes, Charsets.ISO_8859_1)
+    val idx = text.indexOf("https://")
+    if (idx < 0) return null
+    val sb = StringBuilder()
+    for (i in idx until minOf(text.length, idx + 512)) {
+        val ch = text[i]
+        if (ch.code < 32 || ch.code > 126 || ch == '\n' || ch == '\r') break
+        sb.append(ch)
+    }
+    return sb.toString().takeIf { it.startsWith("https://") }
+}
+
+/** Plain file access. Works on Android 8-9, and any device where the OS permits direct access. */
 class FileSystemSource : TikTokSource {
     override val label = "direct file access"
 
@@ -41,17 +64,29 @@ class FileSystemSource : TikTokSource {
     override fun candidates(): Sequence<Candidate> = sequence {
         for (root in roots) {
             if (!root.isDirectory) continue
-            for ((path, size) in CandidateRules.walk(root)) {
+            val all = CandidateRules.walk(root)
+            val configUrls = HashMap<String, String>()
+            val imageFiles = ArrayList<Pair<String, Long>>()
+            for ((path, size) in all) {
+                if (path.contains("image_config") && size in 40..4096) {
+                    val url = extractHintUrl(runCatching { File(path).readBytes() }.getOrNull())
+                    if (url != null) configUrls[keyOf(File(path).name)] = url
+                } else {
+                    imageFiles += path to size
+                }
+            }
+            for ((path, size) in imageFiles) {
                 val f = File(path)
-                yield(Candidate(keyOf(f.name), path, size) { runCatching { f.readBytes() }.getOrNull() })
+                val key = keyOf(f.name)
+                yield(Candidate(key, path, size, configUrls[key]) { runCatching { f.readBytes() }.getOrNull() })
             }
         }
     }
 }
 
-/** Storage Access Framework tree the user granted (Android 10-12 can still grant Android/data/<pkg>). */
+/** Storage Access Framework tree the user granted (works on Android 10-12 without any 3rd-party app). */
 class SafSource(private val context: Context, private val tree: Uri) : TikTokSource {
-    override val label = "granted folder"
+    override val label = "granted TikTok folder"
 
     private data class Child(val docId: String, val name: String, val isDir: Boolean, val size: Long)
 
@@ -88,6 +123,7 @@ class SafSource(private val context: Context, private val tree: Uri) : TikTokSou
     override fun candidates(): Sequence<Candidate> = sequence {
         val stickerFirst = ArrayList<Candidate>()
         val rest = ArrayList<Candidate>()
+        val configUrls = HashMap<String, String>()
         val stack = ArrayDeque<Pair<String, Int>>()
         stack.addLast(DocumentsContract.getTreeDocumentId(tree) to 0)
         while (stack.isNotEmpty() && stickerFirst.size + rest.size < 20_000) {
@@ -95,9 +131,14 @@ class SafSource(private val context: Context, private val tree: Uri) : TikTokSou
             for (ch in children(docId)) {
                 if (ch.isDir) {
                     if (depth < CandidateRules.MAX_DEPTH && !CandidateRules.skipDir(ch.name)) stack.addLast(ch.docId to depth + 1)
+                } else if (ch.docId.contains("image_config") && ch.size in 40..4096) {
+                    val docUri = DocumentsContract.buildDocumentUriUsingTree(tree, ch.docId)
+                    val bytes = runCatching { context.contentResolver.openInputStream(docUri)?.use { it.readBytes() } }.getOrNull()
+                    extractHintUrl(bytes)?.let { configUrls[keyOf(ch.name)] = it }
                 } else if (CandidateRules.acceptFile(ch.name, ch.size)) {
                     val docUri = DocumentsContract.buildDocumentUriUsingTree(tree, ch.docId)
-                    val cand = Candidate(keyOf(ch.name), ch.docId, ch.size) {
+                    val key = keyOf(ch.name)
+                    val cand = Candidate(key, ch.docId, ch.size, configUrls[key]) {
                         runCatching { context.contentResolver.openInputStream(docUri)?.use { it.readBytes() } }.getOrNull()
                     }
                     if (CandidateRules.isStickerPath(ch.docId)) stickerFirst += cand else rest += cand
@@ -109,44 +150,13 @@ class SafSource(private val context: Context, private val tree: Uri) : TikTokSou
     }
 }
 
-/** Privileged reads through Shizuku (Android 11+ without root). */
-class ShizukuSource(private val service: IFileService) : TikTokSource {
-    override val label = "Shizuku"
-
-    override fun candidates(): Sequence<Candidate> = sequence {
-        val dataRoot = CandidateRules.androidDataRoot()
-        for (pkg in CandidateRules.PACKAGES) {
-            for (sub in CandidateRules.SUB_ROOTS) {
-                val root = "$dataRoot/$pkg/$sub"
-                if (!runCatching { service.exists(root) }.getOrDefault(false)) continue
-                var skip = 0
-                while (true) {
-                    val page = runCatching { service.listPage(root, skip, 400) }.getOrNull() ?: break
-                    if (page.isEmpty()) break
-                    for (line in page) {
-                        val size = line.substringBefore('|').toLongOrNull() ?: continue
-                        val path = line.substringAfter('|')
-                        yield(Candidate(keyOf(path.substringAfterLast('/')), path, size) {
-                            runCatching {
-                                service.open(path).let { pfd ->
-                                    android.os.ParcelFileDescriptor.AutoCloseInputStream(pfd).use { it.readBytes() }
-                                }
-                            }.getOrNull()
-                        })
-                    }
-                    skip += page.size
-                }
-            }
-        }
-    }
-}
-
-/** Files the user picked or shared to the app explicitly. */
+/** Files the user picked or shared to the app explicitly (e.g. .cnt / WebP / GIF / PNG). */
 class UriSource(private val context: Context, private val uris: List<Uri>) : TikTokSource {
     override val label = "selected files"
 
     override fun candidates(): Sequence<Candidate> = uris.asSequence().map { uri ->
-        Candidate(uri.lastPathSegment?.substringAfterLast('/') ?: "picked", uri.toString(), 0L) {
+        val rawName = uri.lastPathSegment?.substringAfterLast('/') ?: "picked"
+        Candidate(keyOf(rawName), uri.toString(), 0L) {
             runCatching { context.contentResolver.openInputStream(uri)?.use { it.readBytes() } }.getOrNull()
         }
     }

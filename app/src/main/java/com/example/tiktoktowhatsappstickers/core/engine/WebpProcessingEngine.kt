@@ -189,7 +189,9 @@ object WebpProcessingEngine {
         Attempt(false, 45, 2, PADDING_PX),
         Attempt(false, 35, 2, 28),
         Attempt(false, 28, 3, 40),
-        Attempt(false, 20, 4, 56)
+        Attempt(false, 20, 4, 56),
+        Attempt(false, 18, 6, 64),
+        Attempt(false, 12, 8, 72)
     )
 
     /** Produces one composited full-canvas frame at a time. Always accessed sequentially. */

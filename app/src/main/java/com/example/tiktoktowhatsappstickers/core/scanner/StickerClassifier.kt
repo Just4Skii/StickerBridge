@@ -8,22 +8,34 @@ import kotlin.math.min
 
 /**
  * Decides whether an image from TikTok's cache is a real sticker, as opposed to avatars, video covers
- * or UI graphics. Stickers are transparent (or animated); photos and covers are opaque rectangles.
+ * or UI graphics. Uses TikTok's image_config CDN URL (when present), folder hints, animation and alpha.
  */
 object StickerClassifier {
 
     data class Verdict(val accept: Boolean, val reason: String)
 
-    private val NON_STICKER_HINTS = listOf("avatar", "profile", "cover", "thumb", "banner", "icon", "splash", "ad_")
+    private val NON_STICKER_HINTS = listOf(
+        "avatar", "profile", "avt-00", "sc=avatar", "cover", "thumb",
+        "banner", "icon", "splash", "ad_", "photomode", "qrcode"
+    )
+    private val STICKER_URL_HINTS = listOf(
+        "video2sticker", "tiktok-dm-sticker", "store_sticker", "static_sticker", "stable_sticker", "sticker"
+    )
 
-    fun classify(bytes: ByteArray, path: String): Verdict {
+    fun classify(bytes: ByteArray, path: String, hintUrl: String? = null): Verdict {
         if (bytes.size < CandidateRules.MIN_BYTES || bytes.size > CandidateRules.MAX_BYTES) {
             return Verdict(false, "size")
         }
         val kind = WebpProcessingEngine.sniff(bytes)
         if (kind == WebpProcessingEngine.Kind.UNKNOWN) return Verdict(false, "not an image")
-        // Photos/covers are JPEG; stickers need transparency, which JPEG can't carry.
+        // Photos/covers/screenshots are JPEG; stickers use WebP/PNG/GIF.
         if (kind == WebpProcessingEngine.Kind.JPEG) return Verdict(false, "jpeg")
+
+        val lowerUrl = hintUrl?.lowercase().orEmpty()
+        if (lowerUrl.isNotEmpty()) {
+            if (NON_STICKER_HINTS.any { it in lowerUrl }) return Verdict(false, "non-sticker url")
+            if (STICKER_URL_HINTS.any { it in lowerUrl }) return Verdict(true, "sticker url")
+        }
 
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
@@ -59,7 +71,6 @@ object StickerClassifier {
                 bmp.getPixel(0, 0), bmp.getPixel(bw - 1, 0), bmp.getPixel(0, bh - 1), bmp.getPixel(bw - 1, bh - 1)
             )
             if (corners.any { (it ushr 24) < 40 }) return true
-            // Fall back to "meaningful share of transparent pixels" for stickers whose corners are filled.
             var transparent = 0
             val total = bw * bh
             val px = IntArray(total)

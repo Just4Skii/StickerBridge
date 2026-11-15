@@ -1,14 +1,14 @@
 {
-  "versionCode": 2,
-  "versionName": "1.1.0",
+  "versionCode": 3,
+  "versionName": "1.2.0",
   "apkUrl": "https://github.com/Just4Skii/StickerBridge/raw/main/stickerbridge.apk",
-  "sha256": "305921357ff97f0588cfe7cc6256f4afae94301c9f836c309e743446cc45bcd5",
+  "sha256": "f923f24141d9a68a5bc8fc80c8b3928afc07892fe1705671887e5bec8f276b5d",
   "changelog": [
-    "Real TikTok sticker cache scanner (Direct, SAF folder grant & Shizuku support for Android 13+)",
-    "Strict 512x512 WebP frame-by-frame scaling for both static & animated GIF/WebP stickers",
-    "Unique SHA-256 sticker IDs & automatic deduplication across all scans and imports",
-    "Removed all sample/mock packs — 100% genuine user stickers only",
-    "In-app 1-click update downloader & background update notifications"
+    "Removed Shizuku completely — zero 3rd-party companion apps required",
+    "Redesigned home UI around Video Comments Grabber, DMs & Saved WebGrabber, Device Cache Scanner, and Gallery/GIF import",
+    "Added built-in TikTok Video Comment & Live DM/Saved Sticker Grabber capturing animated & static comment/chat stickers with SHA-256 deduplication",
+    "Improved TikTok image_config URL matching and added System Files .cnt share-sheet import for Android 13+",
+    "Deeper animated WebP compression fallback to fit WhatsApp's strict 512x512 <= 500 KB limit"
   ],
   "mandatory": false,
   "minSdk": 24

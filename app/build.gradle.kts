@@ -20,8 +20,8 @@ android {
         minSdk = 24
         targetSdk = 36
         // Bump BOTH on every release. update.json (repo root) must carry the same versionCode.
-        versionCode = 2
-        versionName = "1.1.0"
+        versionCode = 3
+        versionName = "1.2.0"
 
         val authority = "com.example.tiktoktowhatsappstickers.stickercontentprovider"
         manifestPlaceholders["contentProviderAuthority"] = authority
@@ -57,7 +57,6 @@ android {
     }
     buildFeatures {
       compose = true
-      aidl = true
       buildConfig = true
       shaders = false
     }
@@ -117,8 +116,4 @@ dependencies {
 
   // Background update checks (notification when a new version is published)
   implementation(libs.androidx.work.runtime.ktx)
-
-  // Shizuku: the only no-root way to read TikTok's cache on Android 13+
-  implementation(libs.shizuku.api)
-  implementation(libs.shizuku.provider)
 }

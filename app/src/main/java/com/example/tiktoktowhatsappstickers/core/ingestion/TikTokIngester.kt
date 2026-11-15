@@ -83,7 +83,7 @@ class TikTokIngester(private val context: Context) {
                 val stickerUrls = extractImageUrlsFromTikTokPage(bodyString)
                 if (stickerUrls.isEmpty()) {
                     return@withContext IngestionResult.Error(
-                        "No sticker assets found in this link. Tip: On TikTok, stickers are saved in your app cache — tap '1-Tap Fetch TikTok Stickers' below to import them directly!"
+                        "No sticker assets found in this link. Tap 'Grab Comments' or open DMs & Saved to capture stickers directly."
                     )
                 }
 
