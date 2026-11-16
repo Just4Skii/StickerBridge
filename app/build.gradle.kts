@@ -20,8 +20,8 @@ android {
         minSdk = 24
         targetSdk = 36
         // Bump BOTH on every release. update.json (repo root) must carry the same versionCode.
-        versionCode = 3
-        versionName = "1.2.0"
+        versionCode = 4
+        versionName = "1.2.1"
 
         val authority = "com.example.tiktoktowhatsappstickers.stickercontentprovider"
         manifestPlaceholders["contentProviderAuthority"] = authority
@@ -116,4 +116,5 @@ dependencies {
 
   // Background update checks (notification when a new version is published)
   implementation(libs.androidx.work.runtime.ktx)
+  implementation(libs.androidx.webkit)
 }

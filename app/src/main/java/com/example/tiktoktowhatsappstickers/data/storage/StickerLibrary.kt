@@ -47,6 +47,8 @@ class StickerLibrary(
         const val PUBLISHER = "StickerBridge"
         private const val AUTO_ANIM = "tt_auto_anim_"
         private const val AUTO_STATIC = "tt_auto_static_"
+        private const val DEVICE_ANIM = "device_auto_anim_"
+        private const val DEVICE_STATIC = "device_auto_static_"
 
         /** Stable sticker id: first 16 bytes of SHA-256 over the original image, hex-encoded. */
         fun idOf(bytes: ByteArray): String {
@@ -58,7 +60,11 @@ class StickerLibrary(
     // ------------------------------------------------------------------ auto packs (scanner)
 
     @Synchronized
-    fun addToAutoPacks(raws: List<Raw>, onProgress: (String) -> Unit = {}): Outcome {
+    fun addToAutoPacks(
+        raws: List<Raw>,
+        isDeviceMedia: Boolean = false,
+        onProgress: (String) -> Unit = {}
+    ): Outcome {
         val known = storage.knownStickerIds().toHashSet()
         var duplicates = 0
         var unusable = 0
@@ -88,30 +94,45 @@ class StickerLibrary(
         for (animated in listOf(true, false)) {
             val queue = fresh.values.filter { it.animated == animated }.toMutableList()
             if (queue.isEmpty()) continue
-            for (pack in autoPacks(animated)) {
+            for (pack in autoPacks(animated, isDeviceMedia)) {
                 if (queue.isEmpty()) break
                 if (pack.realStickerCount >= MAX_PER_PACK) continue
                 touched[pack.id] = appendTo(pack, queue)
             }
             while (queue.isNotEmpty()) {
-                val pack = newAutoPack(animated)
+                val pack = newAutoPack(animated, isDeviceMedia)
                 touched[pack.id] = appendTo(pack, queue)
             }
         }
         return Outcome(fresh.size, duplicates, unusable, touched.values.toList())
     }
 
-    private fun autoPacks(animated: Boolean): List<StickerPack> {
-        val prefix = if (animated) AUTO_ANIM else AUTO_STATIC
+    private fun autoPacks(animated: Boolean, isDeviceMedia: Boolean): List<StickerPack> {
+        val prefix = when {
+            isDeviceMedia && animated -> DEVICE_ANIM
+            isDeviceMedia -> DEVICE_STATIC
+            animated -> AUTO_ANIM
+            else -> AUTO_STATIC
+        }
         return storage.getPacks()
             .filter { it.autoManaged && it.id.startsWith(prefix) }
             .sortedBy { it.id.removePrefix(prefix).toIntOrNull() ?: Int.MAX_VALUE }
     }
 
-    private fun newAutoPack(animated: Boolean): StickerPack {
-        val prefix = if (animated) AUTO_ANIM else AUTO_STATIC
-        val next = (autoPacks(animated).maxOfOrNull { it.id.removePrefix(prefix).toIntOrNull() ?: 0 } ?: 0) + 1
-        val base = if (animated) "TikTok Animated Stickers" else "TikTok Stickers"
+    private fun newAutoPack(animated: Boolean, isDeviceMedia: Boolean): StickerPack {
+        val prefix = when {
+            isDeviceMedia && animated -> DEVICE_ANIM
+            isDeviceMedia -> DEVICE_STATIC
+            animated -> AUTO_ANIM
+            else -> AUTO_STATIC
+        }
+        val next = (autoPacks(animated, isDeviceMedia).maxOfOrNull { it.id.removePrefix(prefix).toIntOrNull() ?: 0 } ?: 0) + 1
+        val base = when {
+            isDeviceMedia && animated -> "Phone GIFs (Animated)"
+            isDeviceMedia -> "Phone Stickers & GIFs"
+            animated -> "TikTok Animated Stickers"
+            else -> "TikTok Stickers"
+        }
         return StickerPack(
             id = "$prefix$next",
             name = if (next == 1) base else "$base #$next",

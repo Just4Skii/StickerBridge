@@ -15,18 +15,10 @@ import com.example.tiktoktowhatsappstickers.data.storage.StickerLibrary
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-/** What the app can use to read TikTok's local cache without any 3rd-party app. */
+/** Clean 1-click local scan route (zero folder browsing or 3rd-party apps). */
 sealed class Route {
     data class Ready(val source: TikTokSource) : Route()
-    /** Android 8-9: standard storage permission. */
-    object NeedStoragePermission : Route()
-    /** Android 10-12: built-in system folder grant on TikTok's cache folder. */
-    object NeedFolderGrant : Route()
-    /**
-     * Android 13+: Android locks other apps out of /Android/data unless accessed via the built-in
-     * Android Files app or via StickerBridge's live in-app TikTok Grabber.
-     */
-    object Android13Restricted : Route()
+    data class NeedMediaPermission(val permission: String) : Route()
 }
 
 class TikTokCacheScanner(private val context: Context) {
@@ -36,7 +28,6 @@ class TikTokCacheScanner(private val context: Context) {
         private const val PREFS = "stickerbridge_prefs"
         private const val KEY_TREE = "tiktok_tree_uri"
         private const val BATCH = 40
-        private const val EXTERNAL_STORAGE_AUTHORITY = "com.android.externalstorage.documents"
     }
 
     data class ScanResult(
@@ -64,54 +55,30 @@ class TikTokCacheScanner(private val context: Context) {
 
     // ------------------------------------------------------------------ access
 
+    fun requiredMediaPermission(): String =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) Manifest.permission.READ_MEDIA_IMAGES
+        else Manifest.permission.READ_EXTERNAL_STORAGE
+
     suspend fun resolveRoute(): Route = withContext(Dispatchers.IO) {
+        val sources = ArrayList<TikTokSource>()
         val direct = FileSystemSource()
-        if (direct.isReadable()) return@withContext Route.Ready(direct)
+        if (direct.isReadable()) sources += direct
 
         savedTree()?.let { tree ->
             val saf = SafSource(context, tree)
-            if (saf.isReadable()) return@withContext Route.Ready(saf)
+            if (saf.isReadable()) sources += saf
         }
 
-        when {
-            Build.VERSION.SDK_INT <= 28 -> {
-                val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.READ_EXTERNAL_STORAGE) ==
-                    PackageManager.PERMISSION_GRANTED
-                if (granted) Route.Ready(direct) else Route.NeedStoragePermission
-            }
-            Build.VERSION.SDK_INT <= 32 -> Route.NeedFolderGrant
-            else -> Route.Android13Restricted
+        val perm = requiredMediaPermission()
+        val mediaGranted = ContextCompat.checkSelfPermission(context, perm) == PackageManager.PERMISSION_GRANTED
+        if (mediaGranted) {
+            sources += MediaStoreStickerSource(context)
+        } else if (sources.isEmpty()) {
+            return@withContext Route.NeedMediaPermission(perm)
         }
-    }
 
-    /** Deep URI directly inside TikTok's sticker cache folder. */
-    fun suggestedFolderUri(): Uri {
-        val pkg = installedTikTokPackage() ?: CandidateRules.PACKAGES.first()
-        return DocumentsContract.buildDocumentUri(
-            EXTERNAL_STORAGE_AUTHORITY,
-            "primary:Android/data/$pkg/cache/picture/fresco_custom_cache"
-        )
-    }
-
-    /**
-     * Opens Android's built-in System Files app (`com.google.android.documentsui`) straight at TikTok's
-     * sticker cache folder so users on Android 13+ can select & Share `.cnt` files to StickerBridge
-     * without installing any 3rd-party app.
-     */
-    fun systemFilesIntent(): Intent {
-        val pkg = installedTikTokPackage() ?: CandidateRules.PACKAGES.first()
-        val folderUri = DocumentsContract.buildDocumentUri(
-            EXTERNAL_STORAGE_AUTHORITY,
-            "primary:Android/data/$pkg/cache/picture/fresco_custom_cache"
-        )
-        return Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(folderUri, "vnd.android.document/directory")
-            component = ComponentName(
-                "com.google.android.documentsui",
-                "com.android.documentsui.files.FilesActivity"
-            )
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        }
+        if (sources.size == 1) Route.Ready(sources.first())
+        else Route.Ready(CompositeSource("device stickers & GIFs", sources))
     }
 
     fun saveFolderGrant(uri: Uri) {
@@ -141,9 +108,11 @@ class TikTokCacheScanner(private val context: Context) {
         val touched = LinkedHashMap<String, StickerPack>()
         val batch = ArrayList<StickerLibrary.Raw>()
 
+        val isDeviceMedia = source !is UriSource && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
+
         fun flush() {
             if (batch.isEmpty()) return
-            val out = library.addToAutoPacks(batch.toList(), onProgress)
+            val out = library.addToAutoPacks(batch.toList(), isDeviceMedia = isDeviceMedia, onProgress = onProgress)
             added += out.added
             already += out.alreadyHad
             unusable += out.unusable
@@ -151,7 +120,7 @@ class TikTokCacheScanner(private val context: Context) {
             batch.clear()
         }
 
-        onProgress("Looking inside TikTok's storage (${source.label})…")
+        onProgress("Scanning ${source.label}…")
         try {
             for (c in source.candidates()) {
                 examined++
@@ -169,8 +138,8 @@ class TikTokCacheScanner(private val context: Context) {
         }
 
         val message = when {
-            examined == 0 -> "Couldn't read files via ${source.label}. Use the Live TikTok Grabber tab to capture comment or chat stickers directly."
-            found == 0 -> "Checked $examined files but none were stickers. View or favorite your stickers in TikTok first, then try again."
+            examined == 0 -> "No stickers or GIFs saved in Downloads/Pictures yet. Use Pull Video Comments or DMs & Saved to grab directly from TikTok!"
+            found == 0 -> "Checked $examined images — none were stickers/GIFs yet. Use Pull Video Comments or DMs & Saved to grab TikTok stickers."
             added == 0 && already > 0 -> "No new stickers found — all $already are already in your library."
             else -> null
         }

@@ -1,6 +1,5 @@
 package com.example.tiktoktowhatsappstickers.ui.main
 
-import android.Manifest
 import android.content.ClipDescription
 import android.content.ClipboardManager
 import android.content.Context
@@ -71,22 +70,16 @@ fun MainScreen(
         if (uris.isNotEmpty()) viewModel.importFromMediaUris(uris)
     }
 
-    val documentPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenMultipleDocuments()
-    ) { uris: List<Uri> ->
-        if (uris.isNotEmpty()) viewModel.scanSelectedFiles(uris)
-    }
-
-    val folderPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocumentTree()
-    ) { uri: Uri? ->
-        viewModel.onFolderGranted(uri)
-    }
-
     val storagePermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { granted: Boolean ->
         viewModel.onStoragePermissionResult(granted)
+    }
+
+    LaunchedEffect(uiState.pendingMediaPermission) {
+        val perm = uiState.pendingMediaPermission ?: return@LaunchedEffect
+        viewModel.consumeMediaPermissionPrompt()
+        storagePermissionLauncher.launch(perm)
     }
 
     Scaffold(
@@ -314,8 +307,8 @@ fun MainScreen(
                         )
                         QuickSourceTile(
                             modifier = Modifier.weight(1f),
-                            icon = Icons.Default.FolderOpen,
-                            label = "Device\nCache",
+                            icon = Icons.Default.AutoFixHigh,
+                            label = "Scan Phone\nGIFs",
                             accent = TikTokPink,
                             enabled = !uiState.isImporting,
                             onClick = { viewModel.scanTikTokCache() }
@@ -485,6 +478,7 @@ fun MainScreen(
         TikTokWebGrabberDialog(
             initialUrl = session.url,
             title = session.title,
+            startInDesktopMode = session.startInDesktopMode,
             onDismiss = { viewModel.closeGrabber() },
             onImportStickers = { packName, raws ->
                 viewModel.importCapturedStickers(packName, raws)
@@ -499,38 +493,6 @@ fun MainScreen(
             onDismiss = { viewModel.selectPack(null) },
             onAddToWhatsApp = { onAddToWhatsAppIntent(it) },
             onDeletePack = { packId -> viewModel.deletePack(packId) }
-        )
-    }
-
-    // Native OS Access Prompts (No 3rd-party apps)
-    uiState.accessPrompt?.let { prompt ->
-        AccessSetupDialog(
-            prompt = prompt,
-            onDismiss = { viewModel.dismissAccessPrompt() },
-            onRequestStoragePermission = {
-                viewModel.dismissAccessPrompt()
-                storagePermissionLauncher.launch(Manifest.permission.READ_EXTERNAL_STORAGE)
-            },
-            onLaunchFolderPicker = { suggestedUri ->
-                viewModel.dismissAccessPrompt()
-                folderPickerLauncher.launch(suggestedUri)
-            },
-            onOpenLiveBrowser = {
-                viewModel.dismissAccessPrompt()
-                viewModel.openTikTokLiveBrowser()
-            },
-            onOpenSystemFiles = {
-                viewModel.dismissAccessPrompt()
-                runCatching {
-                    context.startActivity(viewModel.systemFilesIntent())
-                }.onFailure {
-                    documentPickerLauncher.launch(arrayOf("*/*"))
-                }
-            },
-            onPickCacheFiles = {
-                viewModel.dismissAccessPrompt()
-                documentPickerLauncher.launch(arrayOf("*/*"))
-            }
         )
     }
 }
@@ -739,110 +701,6 @@ private fun UpdateBanner(
                     }
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun AccessSetupDialog(
-    prompt: AccessPrompt,
-    onDismiss: () -> Unit,
-    onRequestStoragePermission: () -> Unit,
-    onLaunchFolderPicker: (Uri) -> Unit,
-    onOpenLiveBrowser: () -> Unit,
-    onOpenSystemFiles: () -> Unit,
-    onPickCacheFiles: () -> Unit
-) {
-    when (prompt) {
-        AccessPrompt.StoragePermission -> {
-            AlertDialog(
-                onDismissRequest = onDismiss,
-                title = { Text("Allow Storage Access", fontWeight = FontWeight.Bold) },
-                text = {
-                    Text("StickerBridge needs storage permission once to scan TikTok's cached stickers on your phone.")
-                },
-                confirmButton = {
-                    Button(
-                        onClick = onRequestStoragePermission,
-                        colors = ButtonDefaults.buttonColors(containerColor = TikTokCyan)
-                    ) {
-                        Text("Grant Permission", color = Color.Black, fontWeight = FontWeight.Bold)
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = onDismiss) { Text("Cancel") }
-                }
-            )
-        }
-        is AccessPrompt.FolderGrant -> {
-            AlertDialog(
-                onDismissRequest = onDismiss,
-                title = { Text("One-Time Folder Access", fontWeight = FontWeight.Bold) },
-                text = {
-                    Text(
-                        "Tap 'Use this folder' on the next screen so StickerBridge can scan TikTok's sticker cache automatically."
-                    )
-                },
-                confirmButton = {
-                    Button(
-                        onClick = { onLaunchFolderPicker(prompt.suggested) },
-                        colors = ButtonDefaults.buttonColors(containerColor = TikTokCyan)
-                    ) {
-                        Text("Open Folder", color = Color.Black, fontWeight = FontWeight.Bold)
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = onDismiss) { Text("Cancel") }
-                }
-            )
-        }
-        AccessPrompt.Android13FilesHelper -> {
-            AlertDialog(
-                onDismissRequest = onDismiss,
-                title = { Text("Android 13+ Privacy Lock", fontWeight = FontWeight.Bold) },
-                text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(
-                            "Android 13+ blocks apps from silently scanning another app's Android/data folder. Without any 3rd-party app, you have two built-in options:",
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                        Text(
-                            "1. DMs & Saved Grabber (Recommended): Open your TikTok chats/comments inside StickerBridge to capture animated stickers live.",
-                            style = MaterialTheme.typography.bodySmall,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Text(
-                            "2. Built-in Android Files: Open Android/data/com.zhiliaoapp.musically/cache/picture/fresco_custom_cache, select .cnt files, and Share → StickerBridge.",
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                    }
-                },
-                confirmButton = {
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
-                        Button(
-                            onClick = onOpenLiveBrowser,
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = ButtonDefaults.buttonColors(containerColor = TikTokCyan)
-                        ) {
-                            Text("Open DMs & Saved Grabber", color = Color.Black, fontWeight = FontWeight.Bold)
-                        }
-                        OutlinedButton(
-                            onClick = onOpenSystemFiles,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("Open Built-In Android Files")
-                        }
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            TextButton(onClick = onPickCacheFiles) {
-                                Text("Pick Files")
-                            }
-                            TextButton(onClick = onDismiss) {
-                                Text("Close")
-                            }
-                        }
-                    }
-                }
-            )
         }
     }
 }

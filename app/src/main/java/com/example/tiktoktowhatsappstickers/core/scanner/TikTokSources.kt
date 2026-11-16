@@ -1,9 +1,11 @@
 package com.example.tiktoktowhatsappstickers.core.scanner
 
+import android.content.ContentUris
 import android.content.Context
 import android.net.Uri
 import android.os.Environment
 import android.provider.DocumentsContract
+import android.provider.MediaStore
 import android.util.Log
 import java.io.File
 
@@ -150,9 +152,75 @@ class SafSource(private val context: Context, private val tree: Uri) : TikTokSou
     }
 }
 
-/** Files the user picked or shared to the app explicitly (e.g. .cnt / WebP / GIF / PNG). */
+/**
+ * One-click scan across accessible device images (MediaStore WebP, GIF, and transparent PNGs saved in
+ * Downloads, Pictures, WhatsApp Stickers/GIFs, etc.) without any manual folder picking.
+ */
+class MediaStoreStickerSource(private val context: Context) : TikTokSource {
+    override val label = "phone stickers & GIFs"
+
+    override fun candidates(): Sequence<Candidate> = sequence {
+        val resolver = context.contentResolver
+        val collection = MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+        val projection = arrayOf(
+            MediaStore.Images.Media._ID,
+            MediaStore.Images.Media.DISPLAY_NAME,
+            MediaStore.Images.Media.MIME_TYPE,
+            MediaStore.Images.Media.SIZE,
+            MediaStore.Images.Media.RELATIVE_PATH
+        )
+        // Only pull WebP, GIF, and PNG (stickers/transparent cutouts) — skip heavy JPEGs & camera photos.
+        val selection = "(${MediaStore.Images.Media.MIME_TYPE} IN ('image/webp','image/gif','image/png')) AND " +
+            "${MediaStore.Images.Media.SIZE} BETWEEN ${CandidateRules.MIN_BYTES} AND ${CandidateRules.MAX_BYTES}"
+
+        try {
+            resolver.query(
+                collection,
+                projection,
+                selection,
+                null,
+                "${MediaStore.Images.Media.DATE_MODIFIED} DESC"
+            )?.use { cursor ->
+                val idCol = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
+                val nameCol = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)
+                val sizeCol = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.SIZE)
+                val pathCol = cursor.getColumnIndex(MediaStore.Images.Media.RELATIVE_PATH)
+                var count = 0
+                while (cursor.moveToNext() && count < 1500) {
+                    val id = cursor.getLong(idCol)
+                    val name = cursor.getString(nameCol) ?: "media_$id"
+                    val size = cursor.getLong(sizeCol)
+                    val rel = if (pathCol >= 0) cursor.getString(pathCol) ?: "" else ""
+                    val lowRel = rel.lowercase()
+                    if ("camera" in lowRel || "screenshots" in lowRel) continue
+                    val contentUri = ContentUris.withAppendedId(collection, id)
+                    count++
+                    yield(
+                        Candidate(keyOf(name), "$rel$name", size) {
+                            runCatching { resolver.openInputStream(contentUri)?.use { it.readBytes() } }.getOrNull()
+                        }
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            Log.w("MediaStoreSource", "Query failed: ${e.message}")
+        }
+    }
+}
+
+/** Runs multiple sources seamlessly behind one button. */
+class CompositeSource(
+    override val label: String,
+    private val sources: List<TikTokSource>
+) : TikTokSource {
+    override fun candidates(): Sequence<Candidate> = sequence {
+        for (src in sources) yieldAll(src.candidates())
+    }
+}
+
+/** Files shared directly to StickerBridge (e.g. .cnt / WebP / GIF / PNG). */
 class UriSource(private val context: Context, private val uris: List<Uri>) : TikTokSource {
-    override val label = "selected files"
+    override val label = "shared files"
 
     override fun candidates(): Sequence<Candidate> = uris.asSequence().map { uri ->
         val rawName = uri.lastPathSegment?.substringAfterLast('/') ?: "picked"

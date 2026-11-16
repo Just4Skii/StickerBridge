@@ -27,16 +27,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
-/** Built-in OS prompts (zero 3rd-party apps required). */
-sealed class AccessPrompt {
-    object StoragePermission : AccessPrompt()
-    data class FolderGrant(val suggested: Uri) : AccessPrompt()
-    object Android13FilesHelper : AccessPrompt()
-}
-
 data class GrabberSession(
     val url: String,
-    val title: String
+    val title: String,
+    val startInDesktopMode: Boolean = false
 )
 
 sealed class UpdateUi {
@@ -55,7 +49,7 @@ data class MainUiState(
     val infoMessage: String? = null,
     val selectedPack: StickerPack? = null,
     val isWhatsAppInstalled: Boolean = true,
-    val accessPrompt: AccessPrompt? = null,
+    val pendingMediaPermission: String? = null,
     val grabberSession: GrabberSession? = null,
     val update: UpdateUi = UpdateUi.None,
     val updateCheckMessage: String? = null
@@ -100,7 +94,11 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
             it.copy(
                 errorMessage = null,
                 infoMessage = null,
-                grabberSession = GrabberSession(url = url, title = "Video Comment Stickers")
+                grabberSession = GrabberSession(
+                    url = url,
+                    title = "Video Comment Stickers",
+                    startInDesktopMode = true
+                )
             )
         }
     }
@@ -112,7 +110,8 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
                 infoMessage = null,
                 grabberSession = GrabberSession(
                     url = "https://www.tiktok.com/messages",
-                    title = "TikTok Live Grabber (DMs & Comments)"
+                    title = "TikTok Live Grabber (DMs & Comments)",
+                    startInDesktopMode = false
                 )
             )
         }
@@ -184,7 +183,7 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
-    // ------------------------------------------------------------------ Native TikTok Cache & Files Scan (Zero 3rd-party apps)
+    // ------------------------------------------------------------------ 1-Click Auto Scan (Zero folder picking or 3rd-party apps)
 
     fun scanTikTokCache() {
         if (_uiState.value.isImporting) return
@@ -192,22 +191,16 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
             _uiState.update {
                 it.copy(
                     isImporting = true,
-                    importProgressMessage = "Checking TikTok sticker folders…",
+                    importProgressMessage = "Scanning stickers & GIFs on device…",
                     errorMessage = null,
                     infoMessage = null,
-                    accessPrompt = null
+                    pendingMediaPermission = null
                 )
             }
             when (val route = scanner.resolveRoute()) {
                 is Route.Ready -> runScan(route.source)
-                Route.NeedStoragePermission -> _uiState.update {
-                    it.copy(isImporting = false, accessPrompt = AccessPrompt.StoragePermission)
-                }
-                Route.NeedFolderGrant -> _uiState.update {
-                    it.copy(isImporting = false, accessPrompt = AccessPrompt.FolderGrant(scanner.suggestedFolderUri()))
-                }
-                Route.Android13Restricted -> _uiState.update {
-                    it.copy(isImporting = false, accessPrompt = AccessPrompt.Android13FilesHelper)
+                is Route.NeedMediaPermission -> _uiState.update {
+                    it.copy(isImporting = false, pendingMediaPermission = route.permission)
                 }
             }
         }
@@ -236,25 +229,18 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
         if (uris.isEmpty() || _uiState.value.isImporting) return
         viewModelScope.launch {
             _uiState.update {
-                it.copy(isImporting = true, importProgressMessage = "Scanning ${uris.size} selected file(s)…", errorMessage = null, infoMessage = null)
+                it.copy(isImporting = true, importProgressMessage = "Importing ${uris.size} shared item(s)…", errorMessage = null, infoMessage = null)
             }
             runScan(UriSource(getApplication(), uris))
         }
     }
 
-    fun systemFilesIntent(): Intent = scanner.systemFilesIntent()
-
-    fun dismissAccessPrompt() = _uiState.update { it.copy(accessPrompt = null) }
-
-    fun onFolderGranted(uri: Uri?) {
-        if (uri == null) return
-        scanner.saveFolderGrant(uri)
-        scanTikTokCache()
-    }
+    fun consumeMediaPermissionPrompt() = _uiState.update { it.copy(pendingMediaPermission = null) }
 
     fun onStoragePermissionResult(granted: Boolean) {
+        _uiState.update { it.copy(pendingMediaPermission = null) }
         if (granted) scanTikTokCache()
-        else _uiState.update { it.copy(errorMessage = "Storage permission is needed to read TikTok's sticker cache on this Android version.") }
+        else _uiState.update { it.copy(errorMessage = "Media permission is required to auto-scan saved GIFs and stickers on this phone.") }
     }
 
     // ------------------------------------------------------------------ Gallery / Share Import

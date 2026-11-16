@@ -1,14 +1,13 @@
 {
-  "versionCode": 3,
-  "versionName": "1.2.0",
+  "versionCode": 4,
+  "versionName": "1.2.1",
   "apkUrl": "https://github.com/Just4Skii/StickerBridge/raw/main/stickerbridge.apk",
-  "sha256": "f923f24141d9a68a5bc8fc80c8b3928afc07892fe1705671887e5bec8f276b5d",
+  "sha256": "7ed4d5576fa03e1a2252c7f5a195f0432e72e8b299b594f9de21800eb7399e4d",
   "changelog": [
-    "Removed Shizuku completely — zero 3rd-party companion apps required",
-    "Redesigned home UI around Video Comments Grabber, DMs & Saved WebGrabber, Device Cache Scanner, and Gallery/GIF import",
-    "Added built-in TikTok Video Comment & Live DM/Saved Sticker Grabber capturing animated & static comment/chat stickers with SHA-256 deduplication",
-    "Improved TikTok image_config URL matching and added System Files .cnt share-sheet import for Android 13+",
-    "Deeper animated WebP compression fallback to fit WhatsApp's strict 512x512 <= 500 KB limit"
+    "Removed all manual folder/file-picking UI for Android 11-13+ in favor of 1-tap MediaStore permission & Live TikTok Grabber",
+    "Fixed Desktop WebView black-screen collapse (100vh -> 0px) and auto-started video links in Desktop View inside TikTokWebGrabber",
+    "Added comment-sign & comment image_list capture alongside comment stickers, plus Mobile Log In, DMs, and Scan More toolbar controls",
+    "Honestly labeled Android 11+ MediaStore scans as Phone GIFs (Animated) / Phone Stickers & GIFs"
   ],
   "mandatory": false,
   "minSdk": 24

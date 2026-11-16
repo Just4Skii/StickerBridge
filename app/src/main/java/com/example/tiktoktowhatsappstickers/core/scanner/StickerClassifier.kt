@@ -22,17 +22,22 @@ object StickerClassifier {
         "video2sticker", "tiktok-dm-sticker", "store_sticker", "static_sticker", "stable_sticker", "sticker"
     )
 
-    fun classify(bytes: ByteArray, path: String, hintUrl: String? = null): Verdict {
+    fun classify(
+        bytes: ByteArray,
+        path: String,
+        hintUrl: String? = null,
+        trustAsSticker: Boolean = false
+    ): Verdict {
         if (bytes.size < CandidateRules.MIN_BYTES || bytes.size > CandidateRules.MAX_BYTES) {
             return Verdict(false, "size")
         }
         val kind = WebpProcessingEngine.sniff(bytes)
         if (kind == WebpProcessingEngine.Kind.UNKNOWN) return Verdict(false, "not an image")
-        // Photos/covers/screenshots are JPEG; stickers use WebP/PNG/GIF.
-        if (kind == WebpProcessingEngine.Kind.JPEG) return Verdict(false, "jpeg")
+        // Photos/covers/screenshots are JPEG; stickers usually use WebP/PNG/GIF unless confirmed by TikTok API.
+        if (kind == WebpProcessingEngine.Kind.JPEG && !trustAsSticker) return Verdict(false, "jpeg")
 
         val lowerUrl = hintUrl?.lowercase().orEmpty()
-        if (lowerUrl.isNotEmpty()) {
+        if (lowerUrl.isNotEmpty() && !trustAsSticker) {
             if (NON_STICKER_HINTS.any { it in lowerUrl }) return Verdict(false, "non-sticker url")
             if (STICKER_URL_HINTS.any { it in lowerUrl }) return Verdict(true, "sticker url")
         }
@@ -43,6 +48,7 @@ object StickerClassifier {
         val h = bounds.outHeight
         if (w <= 0 || h <= 0) return Verdict(false, "undecodable")
         if (min(w, h) < 48 || max(w, h) > 1600) return Verdict(false, "dimensions ${w}x$h")
+        if (trustAsSticker) return Verdict(true, "api sticker")
         val aspect = w.toFloat() / h
         if (aspect < 0.5f || aspect > 2.0f) return Verdict(false, "aspect")
 
